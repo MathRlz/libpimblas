@@ -10,7 +10,7 @@ extern "C" {
 int gemv_f_basic(uint32_t m, uint32_t n, const float *mat, const float *vec, float *out) {
   uint32_t numDPUs = 64;  // number of available DPUs
   uint32_t rowsPerDPU;
-  gemv_launch_statistics(m, n, numDPUs, rowsPerDPU);
+  gemv_launch_statistics<float>(m, n, numDPUs, rowsPerDPU);
 
   show_trace("gemv_f m={}, n={}, numDPUs={}, rowsPerDPU={}", m, n, numDPUs, rowsPerDPU);
   dpu_set_t set;
@@ -50,7 +50,7 @@ int gemv_f(uint32_t m, uint32_t n, const float *A, const float *x, float *y, con
 
   uint32_t numDPUs = 64;  // number of available DPUs
   uint32_t rowsPerDPU;
-  gemv_launch_statistics(m, n, numDPUs, rowsPerDPU);
+  gemv_launch_statistics<float>(m, n, numDPUs, rowsPerDPU);
 
   show_trace("gemv_f m={}, n={}, A={}, x={}, y={}, alpha={}, beta={}, numDPUs={}, rowsPerDPU={}", m, n,
              reinterpret_cast<const uintptr_t>(A), reinterpret_cast<const uintptr_t>(x),

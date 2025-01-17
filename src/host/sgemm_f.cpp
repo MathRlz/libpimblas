@@ -48,7 +48,7 @@ void sgemm_f(uint32_t rowsA, uint32_t rowsB, uint32_t colsB, const float *A, con
              float beta) {
   uint32_t numDPUs = 64;
   uint32_t rowsPerDPU;
-  gemv_launch_statistics(rowsA, rowsB, numDPUs, rowsPerDPU);
+  gemv_launch_statistics<float>(rowsA, rowsB, numDPUs, rowsPerDPU);
 
   dpu_set_t set;
   DPU_ASSERT(dpu_alloc(numDPUs, nullptr, &set));

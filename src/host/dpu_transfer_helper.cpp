@@ -102,6 +102,7 @@ size_t transfer_full_to_mram_directly(dpu_set_t set, uint32_t nrDPUs, size_t off
   return offset + copySize;
 }
 
+template <typename T>
 void gemv_launch_statistics(uint32_t m, uint32_t n, uint32_t &numDPUs, uint32_t &rowsPerDPU) {
   // Assumptions:
   // MRAM size of each DPU is 64MB
@@ -114,7 +115,7 @@ void gemv_launch_statistics(uint32_t m, uint32_t n, uint32_t &numDPUs, uint32_t 
   // At minimum two rows per tasklet (because the output needs to be 8B aligned)
 
   rowsPerDPU = alignUp((m - 1) / numDPUs + 1, 32);
-  size_t memory_requirement = (n * (rowsPerDPU + 1) + 2 * rowsPerDPU) * sizeof(float);
+  size_t memory_requirement = (n * (rowsPerDPU + 1) + 2 * rowsPerDPU) * sizeof(T);
 
   // Let's leave 1 MB
   constexpr size_t mem_cap = 63 * 1024 * 1024;
@@ -123,7 +124,7 @@ void gemv_launch_statistics(uint32_t m, uint32_t n, uint32_t &numDPUs, uint32_t 
     memory_requirement = n * (rowsPerDPU + 1) + 2 * rowsPerDPU;
   }
 
-  constexpr size_t minRowsPerDPU = 32 * 8 / sizeof(float);
+  constexpr size_t minRowsPerDPU = 32 * 8 / sizeof(T);
   if (rowsPerDPU < minRowsPerDPU) {
     rowsPerDPU = minRowsPerDPU;
   }
@@ -135,13 +136,28 @@ void gemv_launch_statistics(uint32_t m, uint32_t n, uint32_t &numDPUs, uint32_t 
 }
 
 // Instantiation
+template void gemv_launch_statistics<int>(uint32_t m, uint32_t n, uint32_t &numDPUs, uint32_t &rowsPerDPU);
+template void gemv_launch_statistics<float>(uint32_t m, uint32_t n, uint32_t &numDPUs, uint32_t &rowsPerDPU);
+
+template size_t transfer_chunks_from_mram_directly<int>(dpu_set_t set, uint32_t nrDPUs, size_t offset, int *data,
+                                                          size_t chunkSize, size_t size);
 template size_t transfer_chunks_from_mram_directly<float>(dpu_set_t set, uint32_t nrDPUs, size_t offset, float *data,
                                                           size_t chunkSize, size_t size);
+
+template size_t transfer_chunks_to_mram_directly<int>(dpu_set_t set, uint32_t nrDPUs, size_t offset, int *data,
+                                                        size_t chunkSize, size_t size);
+template size_t transfer_chunks_to_mram_directly<const int>(dpu_set_t set, uint32_t nrDPUs, size_t offset, const int *data,
+                                                        size_t chunkSize, size_t size);
 
 template size_t transfer_chunks_to_mram_directly<float>(dpu_set_t set, uint32_t nrDPUs, size_t offset, float *data,
                                                         size_t chunkSize, size_t size);
 template size_t transfer_chunks_to_mram_directly<const float>(dpu_set_t set, uint32_t nrDPUs, size_t offset,
                                                               const float *data, size_t chunkSize, size_t size);
+
+template size_t transfer_full_to_mram_directly<int>(dpu_set_t set, uint32_t nrDPUs, size_t offset, int *data,
+                                                      size_t size);
+template size_t transfer_full_to_mram_directly<const int>(dpu_set_t set, uint32_t nrDPUs, size_t offset,
+                                                            const int *data, size_t size);
 
 template size_t transfer_full_to_mram_directly<float>(dpu_set_t set, uint32_t nrDPUs, size_t offset, float *data,
                                                       size_t size);
