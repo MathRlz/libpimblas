@@ -1,25 +1,7 @@
 #include <cassert>
 
-#include "common.hpp"
 #include "dpu_transfer_helper.hpp"
-
-template <typename T>
-void transposeMatrix(const T *matrix, T *result, size_t rows, size_t cols) {
-  for (size_t i = 0; i < rows; i++) {
-    for (size_t j = 0; j < cols; j++) {
-      result[j * rows + i] = matrix[i * cols + j];
-    }
-  }
-}
-
-template <typename T>
-void convertRowToColumnMajor(const T *rowMajor, T *columnMajor, size_t rows, size_t cols, size_t ld) {
-  for (size_t i = 0; i < rows; i++) {
-    for (size_t j = 0; j < cols; j++) {
-      columnMajor[j * rows + i] = rowMajor[i * ld + j];
-    }
-  }
-}
+#include "gemvf_kernel.hpp"
 
 template <typename T>
 void convertColumnToRowMajor(const T *columnMajor, T *rowMajor, size_t rows, size_t cols, size_t ld) {
@@ -30,58 +12,26 @@ void convertColumnToRowMajor(const T *columnMajor, T *rowMajor, size_t rows, siz
   }
 }
 
-void calculate_single_row(dpu_set_t set, uint32_t numDPUs, uint32_t rowsPerDPU, uint32_t m, uint32_t n, size_t x_offset,
-                          const float *vecB, float *vecC) {
-  size_t y_offset = transfer_full_to_mram_directly(set, numDPUs, x_offset, vecB, n);
-  transfer_chunks_to_mram_directly(set, numDPUs, y_offset, vecC, rowsPerDPU, m);
-
-  DPU_ASSERT(dpu_launch(set, DPU_SYNCHRONOUS));
-
-  transfer_chunks_from_mram_directly(set, numDPUs, y_offset, vecC, rowsPerDPU, m);
-}
-
 // Assumption A is in row order, B and C are in column order
 // A is of size rowsA x rowsB
 // B rowsB x colsB
 // C rowsA x rowsB
-void sgemm_f(uint32_t rowsA, uint32_t rowsB, uint32_t colsB, const float *A, const float *B, float *C, float alpha,
-             float beta) {
-  uint32_t numDPUs = 64;
-  uint32_t rowsPerDPU;
-  gemv_launch_statistics<float>(rowsA, rowsB, numDPUs, rowsPerDPU);
+void sgemm_f(uint32_t rowsA, uint32_t rowsB, uint32_t colsB, const float *A, const float *B, float *C,
+             const float *alpha, const float *beta) {
+  GEMVF_Kernel kernel;
+  kernel.init(rowsA, rowsB);
 
-  dpu_set_t set;
-  DPU_ASSERT(dpu_alloc(numDPUs, nullptr, &set));
-
-  char *kernName = pimblas_get_kernel_dir_concat_free("gemv_f_y.kernel");
-  show_debug("kern_path = {}", kernName);
-  DPU_ASSERT(dpu_load(set, kernName, nullptr));
-  free(kernName);
-
-  struct params {
-    uint32_t rows_per_dpu;
-    uint32_t row_size;
-    float alpha;
-    float beta;
-  };
-
-  params args = {.rows_per_dpu = rowsPerDPU, .row_size = rowsB, .alpha = alpha, .beta = beta};
-
-  transfer_full_to_mram(set, "args", reinterpret_cast<uint8_t *>(&args), sizeof(args));
-
-  size_t A_offset = 0;
-  size_t x_offset = transfer_chunks_to_mram_directly(set, numDPUs, 0, A, rowsPerDPU * rowsB, rowsA * rowsB);
+  kernel.set_params(alpha, beta, false);
+  kernel.set_A(A, false);
 
   for (uint32_t i = 0; i < colsB; i++) {
-    size_t y_offset = transfer_full_to_mram_directly(set, numDPUs, x_offset, B + rowsB * i, rowsB);
-    transfer_chunks_to_mram_directly(set, numDPUs, y_offset, C + rowsA * i, rowsPerDPU, rowsA);
-
-    DPU_ASSERT(dpu_launch(set, DPU_SYNCHRONOUS));
-
-    transfer_chunks_from_mram_directly(set, numDPUs, y_offset, C + rowsA * i, rowsPerDPU, rowsA);
+    kernel.set_x(B + rowsB * i, false);
+    kernel.set_y(C + rowsA * i, false);
+    kernel.launch(false);
+    kernel.get_y(C + rowsA * i, false);
   }
 
-  DPU_ASSERT(dpu_free(set));
+  kernel.free_dpus();
 }
 
 bool is_transpose(char trans) {
@@ -101,7 +51,6 @@ bool is_transpose(char trans) {
 // op(A) is an m by k matrix
 // op(B) is a k by n matrix
 // C is an m by n matrix
-
 void sgemm_wrapper(const char *transa, const char *transb, const int *m, const int *n, const int *k, const float *alpha,
                    const float *a, const int *lda, const float *b, const int *ldb, const float *beta, float *c,
                    const int *ldc) {
@@ -148,7 +97,7 @@ void sgemm_wrapper(const char *transa, const char *transb, const int *m, const i
   // C is already in column major order no need to do anything
   assert(*ldc == *m && "Unexpected padding in matrix C - UNHANDLED");
 
-  sgemm_f(*m, *k, *n, a_buffer, b_buffer, c, *alpha, *beta);
+  sgemm_f(*m, *k, *n, a_buffer, b_buffer, c, alpha, beta);
 
   free(a_tmp_buffer);
   free(b_tmp_buffer);

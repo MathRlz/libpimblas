@@ -1,5 +1,6 @@
 #include "common.hpp"
 #include "dpu_transfer_helper.hpp"
+#include "gemvf_kernel.hpp"
 
 void print_output(dpu_set_t set) {
   dpu_set_t dpu;
@@ -8,79 +9,50 @@ void print_output(dpu_set_t set) {
 
 extern "C" {
 int gemv_f_basic(uint32_t m, uint32_t n, const float *mat, const float *vec, float *out) {
+  Kernel kernel;
+
   uint32_t numDPUs = 64;  // number of available DPUs
   uint32_t rowsPerDPU;
   gemv_launch_statistics<float>(m, n, numDPUs, rowsPerDPU);
 
-  show_trace("gemv_f m={}, n={}, numDPUs={}, rowsPerDPU={}", m, n, numDPUs, rowsPerDPU);
-  dpu_set_t set;
-  DPU_ASSERT(dpu_alloc(numDPUs, nullptr, &set));
-  char *kernName = pimblas_get_kernel_dir_concat_free("gemv_f.kernel");
-  show_debug("kern_path = {}", kernName);
+  dpu_set_t dpu_set;
+  DPU_ASSERT(dpu_alloc(numDPUs, nullptr, &dpu_set));
 
-  DPU_ASSERT(dpu_load(set, kernName, nullptr));
-  free(kernName);
+  kernel.set_dpu_set(dpu_set, numDPUs);
+  kernel.load_program("gemv_f.kernel");
 
   uint32_t metadata[2] = {rowsPerDPU, n};
 
-  transfer_full_to_mram(set, "metadata", metadata, 2);
+  kernel.set_arg_broadcast("metadata", 0, metadata, sizeof(uint32_t) * 2, false);
 
-  size_t offset = 0;
-  offset = transfer_chunks_to_mram_directly(set, numDPUs, offset, mat, rowsPerDPU * n, m * n);
-  offset = transfer_full_to_mram_directly(set, numDPUs, offset, vec, n);
+  size_t A_offset = 0;
+  size_t x_offset = alignUp(rowsPerDPU * n * sizeof(float), 8);
+  size_t result_offset = x_offset + alignUp(n * sizeof(float), 8);
 
-  DPU_ASSERT(dpu_launch(set, DPU_SYNCHRONOUS));
+  kernel.set_arg_scatter(DPU_MRAM_HEAP_POINTER_NAME, A_offset, mat, rowsPerDPU * n * sizeof(float),
+                         m * n * sizeof(float), false);
 
-  // print_output(set);
+  kernel.set_arg_broadcast(DPU_MRAM_HEAP_POINTER_NAME, x_offset, vec, n * sizeof(float), false);
 
-  transfer_chunks_from_mram_directly(set, numDPUs, offset, out, rowsPerDPU, m);
+  kernel.launch(false);
 
-  DPU_ASSERT(dpu_free(set));
+  kernel.get_arg_gather(DPU_MRAM_HEAP_POINTER_NAME, result_offset, out, rowsPerDPU * sizeof(float), m * sizeof(float),
+                        false);
 
+  kernel.free_dpus();
   return 0;
 }
 
 int gemv_f(uint32_t m, uint32_t n, const float *A, const float *x, float *y, const float *alpha, const float *beta) {
-  struct params {
-    uint32_t rows_per_dpu;
-    uint32_t row_size;
-    float alpha;
-    float beta;
-  };
-
-  uint32_t numDPUs = 64;  // number of available DPUs
-  uint32_t rowsPerDPU;
-  gemv_launch_statistics<float>(m, n, numDPUs, rowsPerDPU);
-
-  show_trace("gemv_f m={}, n={}, A={}, x={}, y={}, alpha={}, beta={}, numDPUs={}, rowsPerDPU={}", m, n,
-             reinterpret_cast<const uintptr_t>(A), reinterpret_cast<const uintptr_t>(x),
-             reinterpret_cast<const uintptr_t>(y), *alpha, *beta, numDPUs, rowsPerDPU);
-
-  dpu_set_t set;
-  DPU_ASSERT(dpu_alloc(numDPUs, nullptr, &set));
-
-  char *kernName = pimblas_get_kernel_dir_concat_free("gemv_f_y.kernel");
-  show_debug("kern_path = {}", kernName);
-  DPU_ASSERT(dpu_load(set, kernName, nullptr));
-  free(kernName);
-
-  params args = {.rows_per_dpu = rowsPerDPU, .row_size = n, .alpha = *alpha, .beta = *beta};
-
-  transfer_full_to_mram(set, "args", reinterpret_cast<uint8_t *>(&args), sizeof(args));
-
-  size_t offset = 0;
-  offset = transfer_chunks_to_mram_directly(set, numDPUs, offset, A, rowsPerDPU * n, m * n);
-  offset = transfer_full_to_mram_directly(set, numDPUs, offset, x, n);
-  transfer_chunks_to_mram_directly(set, numDPUs, offset, y, rowsPerDPU, m);
-
-  DPU_ASSERT(dpu_launch(set, DPU_SYNCHRONOUS));
-
-  // print_output(set);
-
-  transfer_chunks_from_mram_directly(set, numDPUs, offset, y, rowsPerDPU, m);
-
-  DPU_ASSERT(dpu_free(set));
-
+  GEMVF_Kernel kernel;
+  kernel.init(m, n);
+  kernel.set_params(alpha, beta, false);
+  kernel.set_A(A, false);
+  kernel.set_x(x, false);
+  kernel.set_y(y, false);
+  kernel.launch(false);
+  kernel.get_y(y, false);
+  kernel.free_dpus();
   return 0;
 }
 }

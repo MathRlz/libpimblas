@@ -1,48 +1,47 @@
-#include "common.hpp"
+#include "kernel.hpp"
 #include "dpu_transfer_helper.hpp"
 
 extern "C" {
 int gemv_int32(uint32_t m, uint32_t n, const int *A, const int *x, int *y, const int *alpha, const int *beta) {
-    struct params {
-        uint32_t rows_per_dpu;
-        uint32_t row_size;
-        int alpha;
-        int beta;
+  Kernel kernel;
+
+  struct params {
+    uint32_t rows_per_dpu;
+    uint32_t row_size;
+    int alpha;
+    int beta;
   };
 
   uint32_t numDPUs = 64;
   uint32_t rowsPerDPU;
+
   gemv_launch_statistics<int>(m, n, numDPUs, rowsPerDPU);
+  dpu_set_t dpu_set;
+  DPU_ASSERT(dpu_alloc(numDPUs, nullptr, &dpu_set));
 
-  show_trace("gemv_f m={}, n={}, A={}, x={}, y={}, alpha={}, beta={}, numDPUs={}, rowsPerDPU={}", m, n,
-             reinterpret_cast<const uintptr_t>(A), reinterpret_cast<const uintptr_t>(x),
-             reinterpret_cast<const uintptr_t>(y), *alpha, *beta, numDPUs, rowsPerDPU);
-
-  dpu_set_t set;
-  DPU_ASSERT(dpu_alloc(numDPUs, nullptr, &set));
-
-  char *kernName = pimblas_get_kernel_dir_concat_free("gemv_int32.kernel");
-  show_debug("kern_path = {}", kernName);
-  DPU_ASSERT(dpu_load(set, kernName, nullptr));
-  free(kernName);
+  kernel.set_dpu_set(dpu_set, numDPUs);
+  kernel.load_program("gemv_int32.kernel");
 
   params args = {.rows_per_dpu = rowsPerDPU, .row_size = n, .alpha = *alpha, .beta = *beta};
+  kernel.set_arg_broadcast("args", 0, &args, sizeof(args), false);
 
-  transfer_full_to_mram(set, "args", reinterpret_cast<uint8_t *>(&args), sizeof(args));
+  size_t A_offset = 0;
+  size_t x_offset = alignUp(rowsPerDPU * n * sizeof(int32_t), 8);
+  size_t y_offset = x_offset + alignUp(n * sizeof(int32_t), 8);
 
-  size_t offset = 0;
-  offset = transfer_chunks_to_mram_directly(set, numDPUs, offset, A, rowsPerDPU * n, m * n);
-  offset = transfer_full_to_mram_directly(set, numDPUs, offset, x, n);
-  transfer_chunks_to_mram_directly(set, numDPUs, offset, y, rowsPerDPU, m);
+  kernel.set_arg_scatter(DPU_MRAM_HEAP_POINTER_NAME, A_offset, A, rowsPerDPU * n * sizeof(int32_t),
+                         m * n * sizeof(int32_t), false);
 
-  DPU_ASSERT(dpu_launch(set, DPU_SYNCHRONOUS));
+  kernel.set_arg_broadcast(DPU_MRAM_HEAP_POINTER_NAME, x_offset, x, n * sizeof(int32_t), false);
 
-  // print_output(set);
+  kernel.set_arg_scatter(DPU_MRAM_HEAP_POINTER_NAME, y_offset, y, rowsPerDPU * sizeof(int32_t), m * sizeof(int32_t), false);
 
-  transfer_chunks_from_mram_directly(set, numDPUs, offset, y, rowsPerDPU, m);
+  kernel.launch(false);
 
-  DPU_ASSERT(dpu_free(set));
+  kernel.get_arg_gather(DPU_MRAM_HEAP_POINTER_NAME, y_offset, y, rowsPerDPU * sizeof(int32_t), m * sizeof(int32_t),
+                        false);
 
+  kernel.free_dpus();
   return 0;
 }
 }

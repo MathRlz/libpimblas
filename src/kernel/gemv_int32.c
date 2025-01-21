@@ -73,7 +73,7 @@ int main() {
   uint32_t mram_offset_in_bytes = 0;
 
   int *A_mram = (int *)(DPU_MRAM_HEAP_POINTER + mram_offset_in_bytes +
-                            (tasklet_id * args.row_size * rows_per_tasklet) * sizeof(int));
+                        (tasklet_id * args.row_size * rows_per_tasklet) * sizeof(int));
   mram_offset_in_bytes += alignUpTo8(args.row_size * args.rows_per_dpu * sizeof(int));
 
   int *x_mram = (int *)(DPU_MRAM_HEAP_POINTER + mram_offset_in_bytes);

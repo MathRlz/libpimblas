@@ -1,7 +1,8 @@
 #pragma once
-#include "common.hpp"
 #include <cstddef>
 #include <cstdint>
+
+#include "common.hpp"
 
 template <typename T>
 T alignUp(T value, size_t alignment) {
@@ -9,8 +10,8 @@ T alignUp(T value, size_t alignment) {
 }
 
 template <typename T>
-size_t transfer_chunks(dpu_set_t set, uint32_t nr_dpus, dpu_xfer_t xfer, dpu_xfer_flags_t flags, const char *symbol_name, size_t sym_offset,
-                     T *data, size_t chunk_size, size_t size) {
+size_t transfer_chunks(dpu_set_t set, uint32_t nr_dpus, dpu_xfer_t xfer, dpu_xfer_flags_t flags,
+                       const char *symbol_name, size_t sym_offset, T *data, size_t chunk_size, size_t size) {
   bool has_remainder = size % chunk_size != 0;
 
   dpu_set_t dpu;
@@ -18,7 +19,7 @@ size_t transfer_chunks(dpu_set_t set, uint32_t nr_dpus, dpu_xfer_t xfer, dpu_xfe
   DPU_FOREACH(set, dpu, dpu_idx) {
     auto offset = dpu_idx * chunk_size;
     if (false == (has_remainder && dpu_idx + 1 == nr_dpus)) {
-      DPU_ASSERT(dpu_prepare_xfer(dpu, (void*)&data[offset]));
+      DPU_ASSERT(dpu_prepare_xfer(dpu, (void *)&data[offset]));
     }
   }
   DPU_ASSERT(dpu_push_xfer(set, xfer, symbol_name, sym_offset, chunk_size * sizeof(T), flags));
@@ -26,7 +27,7 @@ size_t transfer_chunks(dpu_set_t set, uint32_t nr_dpus, dpu_xfer_t xfer, dpu_xfe
   if (has_remainder) {
     auto offset = (nr_dpus - 1) * chunk_size;
     auto remainder = size - offset;
-    DPU_ASSERT(dpu_prepare_xfer(dpu, (void*)&data[offset]));
+    DPU_ASSERT(dpu_prepare_xfer(dpu, (void *)&data[offset]));
     DPU_ASSERT(dpu_push_xfer(dpu, xfer, symbol_name, sym_offset, alignUp(remainder * sizeof(T), 8), flags));
   }
 
@@ -34,31 +35,12 @@ size_t transfer_chunks(dpu_set_t set, uint32_t nr_dpus, dpu_xfer_t xfer, dpu_xfe
 }
 
 template <typename T>
-size_t transfer_full(dpu_set_t set, dpu_xfer_flags_t flags, const char *symbol_name, size_t sym_offset, T *data, size_t size) {
+size_t transfer_full(dpu_set_t set, dpu_xfer_flags_t flags, const char *symbol_name, size_t sym_offset, T *data,
+                     size_t size) {
   size_t copySize = alignUp(size * sizeof(T), 8);
   DPU_ASSERT(dpu_broadcast_to(set, symbol_name, sym_offset, data, copySize, flags));
   return sym_offset + copySize;
 }
-
-template <typename T>
-void transfer_chunks_to_mram(dpu_set_t set, const char *symbol, T *data, size_t chunk_size, size_t size);
-
-template <typename T>
-void transfer_full_to_mram(dpu_set_t set, const char *symbol, T *data, size_t size);
-
-template <typename T>
-void transfer_chunks_from_mram(dpu_set_t set, const char *symbol, T *data, size_t chunk_size, size_t size);
-
-template <typename T>
-size_t transfer_chunks_from_mram_directly(dpu_set_t set, uint32_t nrDPUs, size_t offset, T *data, size_t chunkSize,
-                                          size_t size);
-
-template <typename T>
-size_t transfer_chunks_to_mram_directly(dpu_set_t set, uint32_t nrDPUs, size_t offset, T *data, size_t chunkSize,
-                                        size_t size);
-
-template <typename T>
-size_t transfer_full_to_mram_directly(dpu_set_t set, uint32_t nrDPUs, size_t offset, T *data, size_t size);
 
 template <typename T>
 void gemv_launch_statistics(uint32_t m, uint32_t n, uint32_t &numDPUs, uint32_t &rowsPerDPU);
