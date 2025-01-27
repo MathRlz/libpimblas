@@ -25,17 +25,26 @@ void GEMVF_Kernel::set_params(const float *alpha, const float *beta, bool async)
 }
 
 void GEMVF_Kernel::init(uint32_t m, uint32_t n) {
-  this->m = m;
-  this->n = n;
-
   this->nr_dpus = 64;
   gemv_launch_statistics<float>(m, n, this->nr_dpus, this->rows_per_dpu);
+  this->init(m, n, nr_dpus, rows_per_dpu);
+}
 
-  DPU_ASSERT(dpu_alloc(this->nr_dpus, nullptr, &this->dpu_set));
+bool GEMVF_Kernel::init(uint32_t m, uint32_t n, uint32_t nr_dpus, uint32_t rows_per_dpu) {
+  this->m = m;
+  this->n = n;
+  this->nr_dpus = nr_dpus;
+  this->rows_per_dpu = rows_per_dpu;
+
+  if (dpu_alloc(this->nr_dpus, nullptr, &this->dpu_set) != DPU_OK) {
+    return false;
+  }
 
   this->load_program("gemv_f_y.kernel");
 
   A_offset = 0;
   x_offset = alignUp(rows_per_dpu * n * sizeof(float), 8);
   y_offset = x_offset + alignUp(n * sizeof(float), 8);
+
+  return true;
 }

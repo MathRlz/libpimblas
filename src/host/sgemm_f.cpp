@@ -1,4 +1,5 @@
 #include <cassert>
+#include <chrono>
 
 #include "dpu_transfer_helper.hpp"
 #include "gemvf_kernel.hpp"
@@ -12,26 +13,74 @@ void convertColumnToRowMajor(const T *columnMajor, T *rowMajor, size_t rows, siz
   }
 }
 
+GEMVF_Kernel &get_free_kernel(std::vector<GEMVF_Kernel> &kernels, size_t &cur_kernel) {
+  if (cur_kernel >= kernels.size()) {
+    cur_kernel = 0;
+  }
+  auto &kernel = kernels[cur_kernel];
+  if (false == kernel.running) {
+    kernel.running = true;
+    cur_kernel++;
+    return kernel;
+  } else {
+    kernel.sync();
+    kernel.running = false;
+    cur_kernel++;
+    return kernel;
+  }
+}
+
 // Assumption A is in row order, B and C are in column order
 // A is of size rowsA x rowsB
 // B rowsB x colsB
 // C rowsA x rowsB
 void sgemm_f(uint32_t rowsA, uint32_t rowsB, uint32_t colsB, const float *A, const float *B, float *C,
              const float *alpha, const float *beta) {
-  GEMVF_Kernel kernel;
-  kernel.init(rowsA, rowsB);
+  uint32_t total_nr_dpus;
+  {
+    dpu_set_t dpu_set;
+    DPU_ASSERT(dpu_alloc(DPU_ALLOCATE_ALL, nullptr, &dpu_set));
+    DPU_ASSERT(dpu_get_nr_dpus(dpu_set, &total_nr_dpus));
+    DPU_ASSERT(dpu_free(dpu_set));
+  }
+  // std::cout << "total nr dpus: " << total_nr_dpus << std::endl;
 
-  kernel.set_params(alpha, beta, false);
-  kernel.set_A(A, false);
+  uint32_t nr_dpus = 64;
+  uint32_t rows_per_dpu = 0;
+  gemv_launch_statistics<float>(rowsA, rowsB, nr_dpus, rows_per_dpu);
 
+  // auto nr_kernels = std::min(total_nr_dpus / nr_dpus, colsB);
+  auto nr_kernels = colsB;
+
+  std::vector<GEMVF_Kernel> kernels(nr_kernels);
+
+  size_t kernel_it = 0;
+  for (kernel_it = 0; kernel_it < kernels.size(); kernel_it++) {
+    auto &kernel = kernels[kernel_it];
+    if (kernel.init(rowsA, rowsB, nr_dpus, rows_per_dpu) == false) {
+      break;
+    }
+
+    kernel.set_params(alpha, beta, false);
+    kernel.set_A(A, true);
+  }
+  kernels.resize(kernel_it);
+
+  show_trace("Running {} kernels. Each kernel with {} DPUs.\n", kernels.size(), nr_dpus);
+
+  size_t cur_kernel = 0;
   for (uint32_t i = 0; i < colsB; i++) {
-    kernel.set_x(B + rowsB * i, false);
-    kernel.set_y(C + rowsA * i, false);
-    kernel.launch(false);
-    kernel.get_y(C + rowsA * i, false);
+    auto &kernel = get_free_kernel(kernels, cur_kernel);
+    kernel.set_x(B + rowsB * i, true);
+    kernel.set_y(C + rowsA * i, true);
+    kernel.launch(true);
+    kernel.get_y(C + rowsA * i, true);
   }
 
-  kernel.free_dpus();
+  for (auto &kernel : kernels) {
+    kernel.sync();
+    kernel.free_dpus();
+  }
 }
 
 bool is_transpose(char trans) {

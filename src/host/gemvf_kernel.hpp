@@ -21,6 +21,9 @@ class GEMVF_Kernel : public Kernel {
   void set_params(const float *alpha, const float *beta, bool async);
 
   void init(uint32_t m, uint32_t n);
+  bool init(uint32_t m, uint32_t n, uint32_t nr_dpus, uint32_t rows_per_dpu);
+
+  bool running = false;
 
  private:
   uint32_t m;

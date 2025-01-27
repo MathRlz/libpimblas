@@ -1,5 +1,5 @@
-#include "kernel.hpp"
 #include "dpu_transfer_helper.hpp"
+#include "kernel.hpp"
 
 extern "C" {
 int gemv_int32(uint32_t m, uint32_t n, const int *A, const int *x, int *y, const int *alpha, const int *beta) {
@@ -34,7 +34,8 @@ int gemv_int32(uint32_t m, uint32_t n, const int *A, const int *x, int *y, const
 
   kernel.set_arg_broadcast(DPU_MRAM_HEAP_POINTER_NAME, x_offset, x, n * sizeof(int32_t), false);
 
-  kernel.set_arg_scatter(DPU_MRAM_HEAP_POINTER_NAME, y_offset, y, rowsPerDPU * sizeof(int32_t), m * sizeof(int32_t), false);
+  kernel.set_arg_scatter(DPU_MRAM_HEAP_POINTER_NAME, y_offset, y, rowsPerDPU * sizeof(int32_t), m * sizeof(int32_t),
+                         false);
 
   kernel.launch(false);
 

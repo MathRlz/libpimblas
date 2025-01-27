@@ -1,3 +1,5 @@
+#include <chrono>
+
 #include "common.hpp"
 #include "test_helper.hpp"
 
@@ -50,9 +52,9 @@ void printMatrix(uint32_t rows, uint32_t cols, const T *data) {
 }
 
 int main(int argc, char **argv) {
-  const int M = 131;
-  const int N = 71;
-  const int K = 43;
+  const int M = 1024;
+  const int N = 1024;
+  const int K = 1024;
   auto A = generateRandomFloats(M * K, 1.0f, 10.0f);
   auto B = generateRandomFloats(K * N, 1.0f, 10.0f);
   auto C = generateRandomFloats(M * N, 1.0f, 10.0f);
@@ -67,7 +69,7 @@ int main(int argc, char **argv) {
   host_sgemm_column_major(A.data(), B.data(), C_host.data(), alpha, beta, M, N, K);
 
   // 0.01 percent difference at most
-  bool same = mostly_same(C.data(), C_host.data(), M * K, 1e-4f);
+  bool same = mostly_same(C.data(), C_host.data(), M * N, 1e-4f);
   if (same) {
     std::cout << "SUCCESS " << std::endl;
     RET_TEST_OK;
