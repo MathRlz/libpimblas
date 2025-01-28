@@ -4,14 +4,7 @@
 #include "dpu_transfer_helper.hpp"
 #include "gemvf_kernel.hpp"
 
-template <typename T>
-void convertColumnToRowMajor(const T *columnMajor, T *rowMajor, size_t rows, size_t cols, size_t ld) {
-  for (size_t i = 0; i < rows; i++) {
-    for (size_t j = 0; j < cols; j++) {
-      rowMajor[i * cols + j] = columnMajor[j * ld + i];
-    }
-  }
-}
+#include "matrix_transpose.hpp"
 
 template <typename Kernel>
 Kernel &get_free_kernel(std::vector<Kernel> &kernels, size_t &cur_kernel) {
@@ -19,6 +12,10 @@ Kernel &get_free_kernel(std::vector<Kernel> &kernels, size_t &cur_kernel) {
     cur_kernel = 0;
   }
   auto &kernel = kernels[cur_kernel];
+  cur_kernel++;
+  return kernel;
+  /*
+
   if (false == kernel.running) {
     kernel.running = true;
     cur_kernel++;
@@ -29,6 +26,7 @@ Kernel &get_free_kernel(std::vector<Kernel> &kernels, size_t &cur_kernel) {
     cur_kernel++;
     return kernel;
   }
+  */
 }
 
 // Assumption A is in row order, B and C are in column order
@@ -133,9 +131,7 @@ void sgemm_wrapper(const char *transa, const char *transb, const int *m, const i
     // it with our algorithm.
     assert(*lda == *m && "Unexpected padding in matrix A - UNHANDLED");
     a_tmp_buffer = reinterpret_cast<float *>(malloc(alignUp(*m * *k * sizeof(float), 8)));
-
-    convertColumnToRowMajor(a, a_tmp_buffer, *m, *k, *lda);
-
+    transpose_matrix_column_major(a, a_tmp_buffer, *m, *k);
     a_buffer = a_tmp_buffer;
   } else {
     // Matrix is in column major order
@@ -159,7 +155,7 @@ void sgemm_wrapper(const char *transa, const char *transb, const int *m, const i
     // we got B (LDB/n, k) and we need it to be B**T (k, n)
     assert(*ldb == *n && "Unexpected padding in matrix B - UNHANDLED");
     b_tmp_buffer = reinterpret_cast<float *>(malloc(alignUp(*n * *k * sizeof(float), 8)));
-    convertColumnToRowMajor(b, b_tmp_buffer, *n, *k, *k);
+    transpose_matrix_column_major(b, b_tmp_buffer, *n, *k);
     b_buffer = b_tmp_buffer;
   }
 
