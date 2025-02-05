@@ -21,7 +21,8 @@ void Kernel::set_arg_broadcast(const char *sym_name, size_t sym_offset, const vo
   }
 }
 
-void Kernel::set_arg_broadcast_exact(const char *sym_name, size_t sym_offset, const void *data, size_t size, bool async) {
+void Kernel::set_arg_broadcast_exact(const char *sym_name, size_t sym_offset, const void *data, size_t size,
+                                     bool async) {
   if (async) {
     transfer_full_exact(dpu_set, DPU_XFER_ASYNC, sym_name, sym_offset, reinterpret_cast<const uint8_t *>(data), size);
   } else {

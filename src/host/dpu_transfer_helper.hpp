@@ -43,7 +43,8 @@ size_t transfer_full(dpu_set_t set, dpu_xfer_flags_t flags, const char *symbol_n
 }
 
 template <typename T>
-size_t transfer_full_exact(dpu_set_t set, dpu_xfer_flags_t flags, const char *symbol_name, size_t sym_offset, T *data, size_t size) {
+size_t transfer_full_exact(dpu_set_t set, dpu_xfer_flags_t flags, const char *symbol_name, size_t sym_offset, T *data,
+                           size_t size) {
   DPU_ASSERT(dpu_broadcast_to(set, symbol_name, sym_offset, data, size, flags));
   return sym_offset + size;
 }

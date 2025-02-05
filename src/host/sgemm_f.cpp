@@ -3,7 +3,6 @@
 
 #include "dpu_transfer_helper.hpp"
 #include "gemvf_kernel.hpp"
-
 #include "matrix_transpose.hpp"
 
 template <typename Kernel>
@@ -42,7 +41,7 @@ void sgemm_f(uint32_t rowsA, uint32_t rowsB, uint32_t colsB, const float *A, con
   auto nr_kernels = colsB;
 
   if (*beta == 0.0f) {
-   std::vector<GEMVF_Kernel> kernels(nr_kernels);
+    std::vector<GEMVF_Kernel> kernels(nr_kernels);
     size_t kernel_it = 0;
     for (kernel_it = 0; kernel_it < kernels.size(); kernel_it++) {
       auto &kernel = kernels[kernel_it];

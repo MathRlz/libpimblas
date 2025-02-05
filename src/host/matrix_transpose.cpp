@@ -1,7 +1,8 @@
 #include "matrix_transpose.hpp"
 
-#include <algorithm>
 #include <immintrin.h>
+
+#include <algorithm>
 
 void transpose8x8_avx(const float *src, float *dst, size_t src_cols, size_t dst_rows) {
   auto col0 = _mm256_loadu_ps(&src[0 * src_cols]);
@@ -13,8 +14,8 @@ void transpose8x8_avx(const float *src, float *dst, size_t src_cols, size_t dst_
   auto col6 = _mm256_loadu_ps(&src[6 * src_cols]);
   auto col7 = _mm256_loadu_ps(&src[7 * src_cols]);
 
-  auto t0 = _mm256_unpacklo_ps(col0, col1); // a00, a10, a01, a11 ...
-  auto t1 = _mm256_unpackhi_ps(col0, col1); // a02, a12, a03, a13
+  auto t0 = _mm256_unpacklo_ps(col0, col1);  // a00, a10, a01, a11 ...
+  auto t1 = _mm256_unpackhi_ps(col0, col1);  // a02, a12, a03, a13
   auto t2 = _mm256_unpacklo_ps(col2, col3);
   auto t3 = _mm256_unpackhi_ps(col2, col3);
   auto t4 = _mm256_unpacklo_ps(col4, col5);
@@ -22,8 +23,8 @@ void transpose8x8_avx(const float *src, float *dst, size_t src_cols, size_t dst_
   auto t6 = _mm256_unpacklo_ps(col6, col7);
   auto t7 = _mm256_unpackhi_ps(col6, col7);
 
-  auto r0 = _mm256_shuffle_ps(t0, t2, 0x44); // a00, a10, a20, a30
-  auto r1 = _mm256_shuffle_ps(t0, t2, 0xEE); // a01, a11, a21, a31
+  auto r0 = _mm256_shuffle_ps(t0, t2, 0x44);  // a00, a10, a20, a30
+  auto r1 = _mm256_shuffle_ps(t0, t2, 0xEE);  // a01, a11, a21, a31
   auto r2 = _mm256_shuffle_ps(t1, t3, 0x44);
   auto r3 = _mm256_shuffle_ps(t1, t3, 0xEE);
   auto r4 = _mm256_shuffle_ps(t4, t6, 0x44);
@@ -31,11 +32,11 @@ void transpose8x8_avx(const float *src, float *dst, size_t src_cols, size_t dst_
   auto r6 = _mm256_shuffle_ps(t5, t7, 0x44);
   auto r7 = _mm256_shuffle_ps(t5, t7, 0xEE);
 
-  auto p0 = _mm256_permute2f128_ps(r0, r4, 0x20); // Low 128 bits of r0 and r4
+  auto p0 = _mm256_permute2f128_ps(r0, r4, 0x20);  // Low 128 bits of r0 and r4
   auto p1 = _mm256_permute2f128_ps(r1, r5, 0x20);
   auto p2 = _mm256_permute2f128_ps(r2, r6, 0x20);
   auto p3 = _mm256_permute2f128_ps(r3, r7, 0x20);
-  auto p4 = _mm256_permute2f128_ps(r0, r4, 0x31); // High 128 bits of r0 and r4
+  auto p4 = _mm256_permute2f128_ps(r0, r4, 0x31);  // High 128 bits of r0 and r4
   auto p5 = _mm256_permute2f128_ps(r1, r5, 0x31);
   auto p6 = _mm256_permute2f128_ps(r2, r6, 0x31);
   auto p7 = _mm256_permute2f128_ps(r3, r7, 0x31);
@@ -51,7 +52,7 @@ void transpose8x8_avx(const float *src, float *dst, size_t src_cols, size_t dst_
 }
 
 void transpose_matrix_column_major(const float *src, float *dst, size_t rows, size_t cols) {
- constexpr size_t block_size = 8;
+  constexpr size_t block_size = 8;
 
   for (size_t i = 0; i < cols; i += block_size) {
     for (size_t j = 0; j < rows; j += block_size) {

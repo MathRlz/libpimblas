@@ -28,7 +28,6 @@ row_size - maximum size of single matrix row
 // TODO: Find even more optimal value
 #define BLOCK_SIZE 256
 
-
 struct params {
   uint32_t rows_per_dpu;
   uint32_t row_size;
