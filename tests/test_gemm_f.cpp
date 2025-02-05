@@ -52,15 +52,15 @@ void printMatrix(uint32_t rows, uint32_t cols, const T *data) {
 }
 
 int main(int argc, char **argv) {
-  const int M = 1024;
-  const int N = 1024;
-  const int K = 1024;
+  const int M = 7936;
+  const int N = 1000;
+  const int K = 7936;
   auto A = generateRandomFloats(M * K, 1.0f, 10.0f);
   auto B = generateRandomFloats(K * N, 1.0f, 10.0f);
   auto C = generateRandomFloats(M * N, 1.0f, 10.0f);
   auto C_host = pimblas::vector<float>(C.begin(), C.end());
   float alpha = 1.0f;
-  float beta = 1.0f;
+  float beta = 0.0f;
 
   char transa = 'n';
   char transb = 'n';

@@ -36,6 +36,8 @@ void sgemm_wrapper(const char *transa, const char *transb, const int *m, const i
                    const float *a, const int *lda, const float *b, const int *ldb, const float *beta, float *c,
                    const int *ldc);
 
+void test_kernel();
+
 /* CBLAS API */
 
 /* end of CBLAS API */

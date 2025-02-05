@@ -3,8 +3,8 @@
 
 #include "dpu_transfer_helper.hpp"
 #include "gemvf_kernel.hpp"
-
 #include "matrix_transpose.hpp"
+#include "timer.hpp"
 
 template <typename Kernel>
 Kernel &get_free_kernel(std::vector<Kernel> &kernels, size_t &cur_kernel) {
@@ -35,18 +35,22 @@ Kernel &get_free_kernel(std::vector<Kernel> &kernels, size_t &cur_kernel) {
 // C rowsA x rowsB
 void sgemm_f(uint32_t rowsA, uint32_t rowsB, uint32_t colsB, const float *A, const float *B, float *C,
              const float *alpha, const float *beta) {
-  uint32_t nr_dpus = 512;
+  uint32_t nr_dpus = 32;
   uint32_t rows_per_dpu = 0;
   gemv_launch_statistics<float>(rowsA, rowsB, nr_dpus, rows_per_dpu);
 
-  auto nr_kernels = colsB;
-
+  auto nr_kernels = rowsB;
+  // auto nr_kernels = 1;
+  Timer timer;
   if (*beta == 0.0f) {
-   std::vector<GEMVF_Kernel> kernels(nr_kernels);
+    std::vector<GEMVF_Kernel> kernels(nr_kernels);
     size_t kernel_it = 0;
     for (kernel_it = 0; kernel_it < kernels.size(); kernel_it++) {
       auto &kernel = kernels[kernel_it];
-      if (kernel.init(rowsA, rowsB, nr_dpus, rows_per_dpu) == false) {
+
+      bool success;
+      TIME_EXECUTION_R(kernel.init(rowsA, rowsB, nr_dpus, rows_per_dpu), success);
+      if (false == success) {
         break;
       }
 
@@ -55,7 +59,7 @@ void sgemm_f(uint32_t rowsA, uint32_t rowsB, uint32_t colsB, const float *A, con
     }
     kernels.resize(kernel_it);
 
-    show_trace("Running {} kernels. Each kernel with {} DPUs.\n", kernels.size(), nr_dpus);
+    show_info("Running {} kernels. Each kernel with {} DPUs. Rows per DPU {}\n", kernels.size(), nr_dpus, rows_per_dpu);
 
     size_t cur_kernel = 0;
     for (uint32_t i = 0; i < colsB; i++) {
@@ -131,7 +135,7 @@ void sgemm_wrapper(const char *transa, const char *transb, const int *m, const i
     // it with our algorithm.
     assert(*lda == *m && "Unexpected padding in matrix A - UNHANDLED");
     a_tmp_buffer = reinterpret_cast<float *>(malloc(alignUp(*m * *k * sizeof(float), 8)));
-    transpose_matrix_column_major(a, a_tmp_buffer, *m, *k);
+    TIME_EXECUTION(transpose_matrix_column_major(a, a_tmp_buffer, *m, *k));
     a_buffer = a_tmp_buffer;
   } else {
     // Matrix is in column major order
@@ -162,7 +166,7 @@ void sgemm_wrapper(const char *transa, const char *transb, const int *m, const i
   // C is already in column major order no need to do anything
   assert(*ldc == *m && "Unexpected padding in matrix C - UNHANDLED");
 
-  sgemm_f(*m, *k, *n, a_buffer, b_buffer, c, alpha, beta);
+  TIME_EXECUTION(sgemm_f(*m, *k, *n, a_buffer, b_buffer, c, alpha, beta));
 
   free(a_tmp_buffer);
   free(b_tmp_buffer);
