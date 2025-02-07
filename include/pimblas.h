@@ -38,6 +38,13 @@ void sgemm_wrapper(const char *transa, const char *transb, const int *m, const i
 void sgemm_int32(uint32_t rowsA, uint32_t rowsB, uint32_t colsB, const int *A, const int *B, int *C, const int *alpha,
                  const int *beta);
 
+typedef struct _dpu_mat_handle_t *dpu_mat_handle_t;
+
+int create_context(dpu_mat_handle_t *dpu_context);
+int destroy_context(dpu_mat_handle_t dpu_context);
+int initialize_context(dpu_mat_handle_t dpu_context, const float *matrix, unsigned int rows, unsigned int cols);
+int multiply_by_vector(dpu_mat_handle_t dpu_context, const float *vecIn, float *vecOut);
+
 /* CBLAS API */
 
 /* end of CBLAS API */
