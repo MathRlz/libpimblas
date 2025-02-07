@@ -41,16 +41,6 @@ int host_sgemm_column_major(const float *A, const float *B, float *C, float alph
   return 0;
 }
 
-template <typename T>
-void printMatrix(uint32_t rows, uint32_t cols, const T *data) {
-  for (auto i = 0; i < rows; i++) {
-    for (auto j = 0; j < cols; j++) {
-      std::cout << data[i * cols + j] << " ";
-    }
-    std::cout << std::endl;
-  }
-}
-
 int main(int argc, char **argv) {
   const int M = 1024;
   const int N = 1024;

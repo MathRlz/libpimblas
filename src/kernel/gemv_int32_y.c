@@ -6,12 +6,15 @@
 #include <string.h>
 
 /*
-Basic GEMV kernel performing A * x
+Basic GEMV kernel performing y = alpha * A * x + beta * y
 A is a matrix of size m x n,
 x is a vector of size n
+y is a vector of size m
 
 Notes:
-Only part of A is transferred to single DPU. Namely rows_per_dpu
+Part of A is transferred to single DPU - rows_per_dpu rows
+Part of y - rows_per_dpu elements
+
 x is same across all DPU's
 
 Computing parameters:
@@ -32,6 +35,7 @@ struct params {
   uint32_t rows_per_dpu;
   uint32_t row_size;
   int alpha;
+  int beta;
 };
 
 __host struct params args;
@@ -93,18 +97,18 @@ int main() {
   // Allocation needs to be aligned to 64B, or we start getting
   // allocations on top of another...
   uint32_t result_size = alignUpTo64(rows_per_tasklet * sizeof(int));
-  int *result_wram = (int *)mem_alloc(result_size);
+  int *mul_result_wram = (int *)mem_alloc(result_size);
 
   // zero out the results - it's required when we are running the kernel multiple times.
-  memset(result_wram, 0, result_size);
+  memset(mul_result_wram, 0, result_size);
 
   int nr_blocks = (args.row_size - 1) / BLOCK_SIZE + 1;
-  for (int block = 0; block < nr_blocks; block++) {
+  for (uint32_t block = 0; block < nr_blocks; block++) {
     const int block_offset = block * BLOCK_SIZE;
 
     int block_length = block_offset + BLOCK_SIZE <= args.row_size ? BLOCK_SIZE : args.row_size - block_offset;
     mram_read((__mram_ptr void *)(x_mram + block_offset), x_wram, BLOCK_SIZE * sizeof(int));
-    for (int i = 0; i < rows_per_tasklet; i++) {
+    for (uint32_t i = 0; i < rows_per_tasklet; i++) {
       int sum = 0;
       uint32_t a_offset = (uint32_t)(A_mram + i * args.row_size + block_offset);
       int *A_wram_read = NULL;
@@ -120,18 +124,20 @@ int main() {
         A_wram_read = A_wram;
       }
 
-      for (int j = 0; j < block_length; ++j) {
+      for (uint32_t j = 0; j < block_length; ++j) {
         sum += A_wram_read[j] * x_wram[j];
       }
 
-      result_wram[i] += sum;
+      mul_result_wram[i] += sum;
     }
   }
 
-  if (args.alpha != 1) {
-    for (uint32_t i = 0; i < rows_per_tasklet; i++) {
-      result_wram[i] *= args.alpha;
-    }
+  int *result_wram = (int *)mem_alloc(result_size);
+  mram_read((__mram_ptr void *)(result_mram), result_wram, rows_per_tasklet * sizeof(int));
+
+  for (uint32_t i = 0; i < rows_per_tasklet; i++) {
+    // y = alpha * Ax + beta * y
+    result_wram[i] = args.alpha * mul_result_wram[i] + args.beta * result_wram[i];
   }
 
   mram_write(result_wram, (__mram_ptr void *)result_mram, rows_per_tasklet * sizeof(int));

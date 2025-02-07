@@ -35,6 +35,8 @@ int vector_add(const int *a_input_ptr, const int *b_input_ptr, size_t num_elem, 
 void sgemm_wrapper(const char *transa, const char *transb, const int *m, const int *n, const int *k, const float *alpha,
                    const float *a, const int *lda, const float *b, const int *ldb, const float *beta, float *c,
                    const int *ldc);
+void sgemm_int32(uint32_t rowsA, uint32_t rowsB, uint32_t colsB, const int *A, const int *B, int *C, const int *alpha,
+                 const int *beta);
 
 /* CBLAS API */
 

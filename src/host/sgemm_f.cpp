@@ -13,19 +13,6 @@ Kernel &get_free_kernel(std::vector<Kernel> &kernels, size_t &cur_kernel) {
   auto &kernel = kernels[cur_kernel];
   cur_kernel++;
   return kernel;
-  /*
-
-  if (false == kernel.running) {
-    kernel.running = true;
-    cur_kernel++;
-    return kernel;
-  } else {
-    kernel.sync();
-    kernel.running = false;
-    cur_kernel++;
-    return kernel;
-  }
-  */
 }
 
 // Assumption A is in row order, B and C are in column order
