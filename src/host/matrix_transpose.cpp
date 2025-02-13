@@ -71,3 +71,24 @@ void transpose_matrix_column_major(const float *src, float *dst, size_t rows, si
     }
   }
 }
+
+void transpose_matrix_row_major(const float *src, float *dst, size_t rows, size_t cols) {
+  constexpr size_t block_size = 8;
+
+  for (size_t i = 0; i < rows; i += block_size) {
+    for (size_t j = 0; j < cols; j += block_size) {
+      size_t block_rows = std::min(block_size, rows - i);
+      size_t block_cols = std::min(block_size, cols - j);
+
+      if (block_rows == 8 && block_cols == 8) {
+        transpose8x8_avx(&src[i * cols + j], &dst[j * rows + i], cols, rows);
+      } else {
+        for (size_t ii = 0; ii < block_rows; ii++) {
+          for (size_t jj = 0; jj < block_cols; jj++) {
+            dst[(j + jj) * rows + (i + ii)] = src[(i + ii) * cols + (j + jj)];
+          }
+        }
+      }
+    }
+  }
+}

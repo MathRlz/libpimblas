@@ -31,7 +31,7 @@ Kernel &get_free_kernel(std::vector<Kernel> &kernels, size_t &cur_kernel) {
 // Assumption A is in row order, B and C are in column order
 // A is of size rowsA x rowsB
 // B rowsB x colsB
-// C rowsA x rowsB
+// C rowsA x colsB
 void sgemm_f(uint32_t rowsA, uint32_t rowsB, uint32_t colsB, const float *A, const float *B, float *C,
              const float *alpha, const float *beta) {
   uint32_t nr_dpus = 512;
@@ -165,4 +165,37 @@ void sgemm_wrapper(const char *transa, const char *transb, const int *m, const i
 
   free(a_tmp_buffer);
   free(b_tmp_buffer);
+}
+
+/*
+A is an m by k matrix
+B is an k by n matrix
+C is an m by n matrix
+All matricies are in row major format. Memory is continuous
+*/
+void gemm_row_maj_f(const int *m, const int *n, const int *k, const float *alpha, const float *a, const float *b,
+                    const float *beta, float *c) {
+  show_trace(
+      "gemm_row_maj_f m=[{}] n=[{}] k=[{}] alpha=[{}] a=[{:#018x}] b=[{:#018x}] "
+      "beta=[{}] c=[{:#018x}]",
+      *m, *n, *k, *alpha, reinterpret_cast<const uintptr_t>(a), reinterpret_cast<const uintptr_t>(b), *beta,
+      reinterpret_cast<const uintptr_t>(c));
+
+  // Get B to column major format
+  float *tmp_b = reinterpret_cast<float *>(malloc(*k * *n * sizeof(float)));
+  transpose_matrix_row_major(b, tmp_b, *k, *n);
+
+  // If Beta is not zero we need to change C to column major format
+  float *tmp_c = reinterpret_cast<float *>(malloc(*m * *n * sizeof(float)));
+  if (*beta != 0.0f) {
+    transpose_matrix_row_major(c, tmp_c, *m, *n);
+  }
+
+  sgemm_f(*m, *k, *n, a, tmp_b, tmp_c, alpha, beta);
+
+  // Get C from col major to row major
+  transpose_matrix_column_major(tmp_c, c, *m, *n);
+
+  free(tmp_b);
+  free(tmp_c);
 }
