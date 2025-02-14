@@ -34,6 +34,18 @@ using vector = std::vector<T, AlignedAllocator<T>>;
 
 }
 
+template<typename T>
+pimblas::vector<T> generateRandomIntegers(size_t size, T min, T max) {
+  static_assert(std::is_integral<T>::value, "T must be an integral type.");
+  show_debug("Generate Random Ints range {} - {}  size={}", min, max, size);
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_int_distribution<T> dis(min, max);
+  pimblas::vector<T> randomNumbers(size);
+  std::for_each(randomNumbers.begin(), randomNumbers.end(), [&dis, &gen](T &v) { v = dis(gen); });
+  return randomNumbers;
+}
+
 pimblas::vector<int> generateRandomIntegers(int size, int min, int max) {
   show_debug("Generate Random Ints range {} - {}  size={}", min, max, size);
   std::random_device rd;

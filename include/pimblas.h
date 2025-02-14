@@ -42,6 +42,8 @@ void gemm_row_maj_f(const int *m, const int *n, const int *k, const float *alpha
 
 int relu_f(float *input, float *output, size_t num_elem);
 
+int clever_dot_product(const uint32_t *vec1, const uint32_t *vec2, size_t vecSize, uint64_t *result);
+
 /* CBLAS API */
 
 /* end of CBLAS API */
