@@ -24,6 +24,8 @@ class Kernel {
 
   void launch(bool async);
 
+  bool allocate_dpus(uint32_t nr_dpus);
+
   void load_program(const char *name);
   void load_program(uint8_t *data, size_t size);
 
@@ -33,6 +35,8 @@ class Kernel {
   const KernelStatus &get_status();
 
   void read_log(FILE *stream = stdout);
+
+  dpu_set_t &get_dpu_set() { return dpu_set; }
 
   void free_dpus();
 

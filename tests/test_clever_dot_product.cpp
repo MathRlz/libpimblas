@@ -10,7 +10,7 @@ uint64_t dotProduct(const uint32_t *vec1, const uint32_t *vec2, size_t size) {
 }
 
 int main() {
-    size_t size = 1024;
+    size_t size = 9999 * 111;
     auto vec1 = generateRandomIntegers<uint32_t>(size, 0, 100);
     auto vec2 = generateRandomIntegers<uint32_t>(size, 0, 100);
 

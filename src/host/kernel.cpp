@@ -57,6 +57,14 @@ void Kernel::launch(bool async) {
   }
 }
 
+bool Kernel::allocate_dpus(uint32_t nr_dpus) {
+  auto success = dpu_alloc(nr_dpus, nullptr, &dpu_set) == DPU_OK;
+  if (success) {
+    this->nr_dpus = nr_dpus;
+  }
+  return success;
+}
+
 void Kernel::load_program(const char *name) {
   char *kernel_path = pimblas_get_kernel_dir_concat_free(name);
   show_debug("kern_path = {}", kernel_path);
