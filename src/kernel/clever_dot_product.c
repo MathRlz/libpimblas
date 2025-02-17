@@ -29,31 +29,29 @@ unsigned int count_all_ones_64(uint64_t value) {
 #define PRECISION 32
 #define BLOCK_SIZE 5
 
-uint64_t clever_dot_product(const uint64_t *arr1, const uint64_t *arr2, uint32_t size) {
+uint64_t clever_dot_product(const uint64_t *arr1, const uint64_t *arr2) {
     uint64_t dp = 0;
 
-    for (int i = 0; i < size; i += PRECISION) {
-        int exp = (PRECISION - 1) << 1;
+    int exp = (PRECISION - 1) << 1;
 
-        for (; exp >= PRECISION; --exp) {
-            uint64_t partSum = 0;
+    for (; exp >= PRECISION; --exp) {
+        uint64_t partSum = 0;
 
-            for (int j = exp - PRECISION + 1; j <= PRECISION - 1; ++j) {
-                partSum += count_all_ones_64(arr1[i+j] & arr2[i+exp-j]);
-            }
-
-            dp += partSum << exp;
+        for (int j = exp - PRECISION + 1; j <= PRECISION - 1; ++j) {
+            partSum += count_all_ones_64(arr1[j] & arr2[exp-j]);
         }
 
-        for (; exp >= 0; --exp) {
-            uint64_t partSum = 0;
+        dp += partSum << exp;
+    }
 
-            for (int j = 0; j <= exp; ++j) {
-                partSum += count_all_ones_64(arr1[i+j] & arr2[i+exp-j]);
-            }
-            
-            dp += partSum << exp;
+    for (; exp >= 0; --exp) {
+        uint64_t partSum = 0;
+
+        for (int j = 0; j <= exp; ++j) {
+            partSum += count_all_ones_64(arr1[j] & arr2[exp-j]);
         }
+        
+        dp += partSum << exp;
     }
 
     return dp;
@@ -92,7 +90,7 @@ int main() {
     mram_read((__mram_ptr void *)(vec1_MRAM + block_offset), vec1[tasklet_id], PRECISION * sizeof(uint64_t));
     mram_read((__mram_ptr void *)(vec2_MRAM + block_offset), vec2[tasklet_id], PRECISION * sizeof(uint64_t));
 
-    tmpResults[tasklet_id] += clever_dot_product(vec1[tasklet_id], vec2[tasklet_id], PRECISION);
+    tmpResults[tasklet_id] += clever_dot_product(vec1[tasklet_id], vec2[tasklet_id]);
   }
 
   barrier_wait(&gather_results_barrier);

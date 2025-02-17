@@ -35,19 +35,19 @@ int clever_dot_product(const uint32_t *vec1, const uint32_t *vec2, size_t vecSiz
     auto tr2 = transposeBits(vec2, vecSize);
 
     size_t trSize = tr1.size();
-    // trChunkSize needs to be aligned to 32
-    size_t trChunkSize = 2 * 1024 * 1024;
+    // trChunkSize needs to be aligned to 32 
+    //size_t trChunkSize = 2 * 1024 * 1024; // Max size
+    size_t trChunkSize = 1024 * 8; // Optimal size for speed somewhere between 2K and 8K
     if (trChunkSize > trSize) {
         trChunkSize = trSize;
     }
 
     size_t remainder = trSize % trChunkSize;
-
     uint32_t nr_dpus = (trSize - 1) / trChunkSize + 1;
 
     Kernel kernel;
     if (false == kernel.allocate_dpus(nr_dpus)) {
-        // Couldn't allocate dpus
+        show_error("clever_dot_product: couldn't allocate required ({}) nr dpus.", nr_dpus);
         return -1;
     }
     kernel.load_program("clever_dot_product.kernel");
