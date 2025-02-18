@@ -10,11 +10,13 @@ uint64_t dotProduct(const uint32_t *vec1, const uint32_t *vec2, size_t size) {
 }
 
 int main() {
-    size_t size = 1024;
+    size_t size = 1024 * 1024;
     auto vec1 = generateRandomIntegers<uint32_t>(size, std::numeric_limits<uint32_t>::min(), std::numeric_limits<uint32_t>::max());
     auto vec2 = generateRandomIntegers<uint32_t>(size, std::numeric_limits<uint32_t>::min(), std::numeric_limits<uint32_t>::max());
 
     auto host_result = dotProduct(vec1.data(), vec2.data(), vec1.size());
+
+    std::cout << "CDP uint32_t 8B rep\n";
     uint64_t clever_8B_dpu_result;
     if (clever_dot_product_uint32_8B(vec1.data(), vec2.data(), vec1.size(), &clever_8B_dpu_result) != 0) {
         RET_TEST_FAIL;
@@ -25,6 +27,7 @@ int main() {
         RET_TEST_FAIL;
     }
 
+    std::cout << "CDP uint32_t 4B rep\n";
     uint64_t clever_4B_dpu_result;
     if (clever_dot_product_uint32_4B(vec1.data(), vec2.data(), vec1.size(), &clever_4B_dpu_result) != 0) {
         RET_TEST_FAIL;
@@ -36,6 +39,7 @@ int main() {
 
     }
 
+    std::cout << "Naive dot product\n";
     uint64_t simple_dpu_result;
     if (dot_product(vec1.data(), vec2.data(), vec1.size(), &simple_dpu_result) != 0) {
         RET_TEST_FAIL;

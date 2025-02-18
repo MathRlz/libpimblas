@@ -1,5 +1,6 @@
 #include "common.hpp"
 #include "kernel.hpp"
+#include "perfcount_helper.hpp"
 
 template <typename T>
 T alignUp(T value, size_t alignment) {
@@ -30,6 +31,7 @@ std::vector<T_rep> transposeBits(const T_src *src, size_t size) {
     return dest;
 }
 
+
 extern "C" {
 int clever_dot_product_uint32_8B(const uint32_t *vec1, const uint32_t *vec2, size_t vecSize, uint64_t *result) {
     auto tr1 = transposeBits<uint64_t, uint32_t>(vec1, vecSize);
@@ -37,8 +39,8 @@ int clever_dot_product_uint32_8B(const uint32_t *vec1, const uint32_t *vec2, siz
 
     size_t trSize = tr1.size();
     // trChunkSize needs to be aligned to 32 
-    //size_t trChunkSize = 2 * 1024 * 1024; // Max size
-    size_t trChunkSize = 1024 * 8; // Optimal size for speed somewhere between 2K and 8K
+    size_t trChunkSize = 2 * 1024 * 1024; // Max size
+    //size_t trChunkSize = 1024 * 8; // Optimal size for speed somewhere between 2K and 8K
     if (trChunkSize > trSize) {
         trChunkSize = trSize;
     }
@@ -82,6 +84,15 @@ int clever_dot_product_uint32_8B(const uint32_t *vec1, const uint32_t *vec2, siz
         *result += partial_result;
     }
 
+    constexpr bool gatherPfResults = true;
+    if constexpr (gatherPfResults) {
+        auto perfRes = get_pf_results(kernel.get_dpu_set());
+        for (auto &perf : perfRes) {
+            std::cout << "cycles: " << perf.nb_cycles 
+                    << ", instr: " << perf.nb_instr << std::endl;
+        }
+    }
+
     kernel.free_dpus();
     return 0;
 }
@@ -92,8 +103,8 @@ int clever_dot_product_uint32_4B(const uint32_t *vec1, const uint32_t *vec2, siz
 
     size_t trSize = tr1.size();
     // trChunkSize needs to be aligned to 32 
-    //size_t trChunkSize = 2 * 1024 * 1024; // Max size
-    size_t trChunkSize = 1024 * 8; // Optimal size for speed somewhere between 2K and 8K
+    size_t trChunkSize = 4 * 1024 * 1024; // Max size
+    //size_t trChunkSize = 1024 * 8; // Optimal size for speed somewhere between 2K and 8K
     if (trChunkSize > trSize) {
         trChunkSize = trSize;
     }
@@ -136,6 +147,16 @@ int clever_dot_product_uint32_4B(const uint32_t *vec1, const uint32_t *vec2, siz
     for (auto &partial_result : results) {
         *result += partial_result;
     }
+
+    constexpr bool gatherPfResults = true;
+    if constexpr (gatherPfResults) {
+        auto perfRes = get_pf_results(kernel.get_dpu_set());
+        for (auto &perf : perfRes) {
+            std::cout << "cycles: " << perf.nb_cycles 
+                    << ", instr: " << perf.nb_instr << std::endl;
+        }
+    }
+
 
     kernel.free_dpus();
     return 0;

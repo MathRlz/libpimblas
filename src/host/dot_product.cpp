@@ -1,3 +1,4 @@
+#include "perfcount_helper.hpp"
 #include "common.hpp"
 #include "kernel.hpp"
 
@@ -44,6 +45,15 @@ int dot_product(const uint32_t *vec1, const uint32_t *vec2, size_t vecSize, uint
     *result = 0U;
     for (auto &partial_result : results) {
         *result += partial_result;
+    }
+
+    constexpr bool gatherPfResults = true;
+    if constexpr (gatherPfResults) {
+        auto perfRes = get_pf_results(kernel.get_dpu_set());
+        for (auto &perf : perfRes) {
+            std::cout << "cycles: " << perf.nb_cycles 
+                    << ", instr: " << perf.nb_instr << std::endl;
+        }
     }
 
     kernel.free_dpus();
