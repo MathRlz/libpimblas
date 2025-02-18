@@ -15,14 +15,25 @@ int main() {
     auto vec2 = generateRandomIntegers<uint32_t>(size, std::numeric_limits<uint32_t>::min(), std::numeric_limits<uint32_t>::max());
 
     auto host_result = dotProduct(vec1.data(), vec2.data(), vec1.size());
-    uint64_t clever_dpu_result;
-    if (clever_dot_product(vec1.data(), vec2.data(), vec1.size(), &clever_dpu_result) != 0) {
+    uint64_t clever_8B_dpu_result;
+    if (clever_dot_product_uint32_8B(vec1.data(), vec2.data(), vec1.size(), &clever_8B_dpu_result) != 0) {
         RET_TEST_FAIL;
     }
 
-    if (host_result != clever_dpu_result) {
-        std::cout << "Results differ. Host_result=" << host_result << ", dpu_result=" << clever_dpu_result << std::endl;
+    if (host_result != clever_8B_dpu_result) {
+        std::cout << "Results differ. Host_result=" << host_result << ", clever_8B_dpu_result=" << clever_8B_dpu_result << std::endl;
         RET_TEST_FAIL;
+    }
+
+    uint64_t clever_4B_dpu_result;
+    if (clever_dot_product_uint32_4B(vec1.data(), vec2.data(), vec1.size(), &clever_4B_dpu_result) != 0) {
+        RET_TEST_FAIL;
+    }
+
+    if (host_result != clever_4B_dpu_result) {
+        std::cout << "Results differ. Host_result=" << host_result << ", clever_4B_dpu_result=" << clever_4B_dpu_result << std::endl;
+        RET_TEST_FAIL;
+
     }
 
     uint64_t simple_dpu_result;

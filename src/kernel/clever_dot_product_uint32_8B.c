@@ -4,7 +4,6 @@
 #include <mram.h>
 #include <stdint.h>
 #include <string.h>
-#include <stdio.h>
 
 __host uint64_t offset;
 __host uint64_t result;
@@ -56,7 +55,6 @@ uint64_t clever_dot_product(const uint64_t *arr1, const uint64_t *arr2) {
 
     return dp;
 }
-
 
 __dma_aligned uint64_t vec1[NR_TASKLETS][PRECISION];
 __dma_aligned uint64_t vec2[NR_TASKLETS][PRECISION];
