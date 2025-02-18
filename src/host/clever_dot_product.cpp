@@ -6,23 +6,24 @@ T alignUp(T value, size_t alignment) {
   return (value + alignment - 1) & ~(alignment - 1);
 }
 
-template <typename T>
-std::vector<uint64_t> transposeBits(T *src, size_t size) {
+template <typename T_rep, typename T_src>
+std::vector<T_rep> transposeBits(const T_src *src, size_t size) {
+    static_assert(std::is_integral<T_rep>::value, "T_rep must be integral");
     constexpr size_t bitsPerByte = 8;
-    constexpr size_t bitsPerLong = sizeof(uint64_t) * bitsPerByte;
-    constexpr size_t bitsPerElement = sizeof(T) * bitsPerByte;
+    constexpr size_t bitsPerRep = sizeof(T_rep) * bitsPerByte;
+    constexpr size_t bitsPerElement = sizeof(T_src) * bitsPerByte;
 
     size_t totalBits = size * bitsPerElement;
-    size_t destSize = alignUp((totalBits + bitsPerLong - 1) / bitsPerLong, 32);
+    size_t destSize = alignUp((totalBits + bitsPerRep - 1) / bitsPerRep, 32);
 
-    std::vector<uint64_t> dest(destSize, 0);
+    std::vector<T_rep> dest(destSize, 0);
 
     for (size_t i = 0; i < size; i++) {
-        size_t arrayOffset = (i / bitsPerLong) * bitsPerElement;
-        size_t offset = (i / bitsPerElement * bitsPerElement) % bitsPerLong;
+        size_t arrayOffset = (i / bitsPerRep) * bitsPerElement;
+        size_t offset = (i / bitsPerElement * bitsPerElement) % bitsPerRep;
 
         for (size_t j = 0; j < bitsPerElement; ++j) {
-            dest[arrayOffset + j] |= ((static_cast<uint64_t>(src[i]) >> j) & 1) << ((i % bitsPerElement) + offset);
+            dest[arrayOffset + j] |= ((static_cast<T_rep>(src[i]) >> j) & 1) << ((i % bitsPerElement) + offset);
         }
     }
     
@@ -31,8 +32,8 @@ std::vector<uint64_t> transposeBits(T *src, size_t size) {
 
 extern "C" {
 int clever_dot_product(const uint32_t *vec1, const uint32_t *vec2, size_t vecSize, uint64_t *result) {
-    auto tr1 = transposeBits(vec1, vecSize);
-    auto tr2 = transposeBits(vec2, vecSize);
+    auto tr1 = transposeBits<uint64_t, uint32_t>(vec1, vecSize);
+    auto tr2 = transposeBits<uint64_t, uint32_t>(vec2, vecSize);
 
     size_t trSize = tr1.size();
     // trChunkSize needs to be aligned to 32 
