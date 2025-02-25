@@ -107,10 +107,7 @@ for_every_exp_top:
     exp_top_finish:
 
     // partSum = partSum << exp
-    // We don't need to care about shifting top part, 
-    // because max number of ones is 32*64, well within 32bits
-    // lsl.u only works on bits 0:4 so max shift is 31, so we can 
-    // treat r5 as it was the high part, shift it by exp-32 and then we add it to the MSB of dot product (r8) 
+    // Exponent here is always greater than 32, so we can just shift the LSB by (exp - 32)
     add tmp_val, exp, -32
     lsl r5, r5, tmp_val // In r5 we now have partsum shifted by exp
 
@@ -168,7 +165,19 @@ for_every_exp_bot:
     // because max number of ones is 32*64, well within 32bits
     // lsl.u only works on bits 0:4 so max shift is 32, here it's ok,
     // because the exp is between 31 and 0
-    lsl.u part_sum, r5, exp
+    // d4 = partsum
+    lslx tmp_val, r5, exp, sh32, .exp_non_zero_2
+
+    lsl r4, r4, exp // r4 = partsum_h << exp
+    lsl r5, r5, exp // r5 = partsum_l << exp
+    or r4, r4, tmp_val // r4 = (partsum_h << exp) | (partsum_l >> (32-exp))
+    jump .exp_finish
+
+    .exp_non_zero_2:
+    lsl r4, r5, exp // partsum = partsum_l << exp
+    move r5, 0
+
+    .exp_finish:
 
     // dp += partSum
     // First lower part LSB
