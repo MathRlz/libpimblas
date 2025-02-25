@@ -1,5 +1,22 @@
-
 .text
+
+.globl bit_shift
+bit_shift: // uint64_t bit_shift(uint64_t value, int exponent);
+// Value is in d0, exponent in r2
+    // Shift LSB by (32  - exp)
+    lslx r3, r1, r2, sh32, .non_zero
+
+    // If no jump, perform additional shift
+    lsl r0, r0, r2 // r0 = value_h << exp
+    lsl r1, r1, r2 // r1 = value_l << exp
+    or r0, r0, r3 // r0 = (value_h << exp) | (value_l >> (32-exp))
+    jump r23
+
+    .non_zero:
+    lsl r0, r1, r2 // r0 = value_l << exp
+    move r1, 0     // r1 = 0
+    jump r23
+
 
 .globl count_all_ones_32
 count_all_ones_32: // uint32_t count_all_ones_32(uint32_t value)
@@ -22,6 +39,10 @@ fast_and: // uint64_t fast_and(uint64_t valueA, uint64_t valueB)
     and r0, r0, r2 // r0 = r0 & r2
     and r1, r1, r3 // r1 = r1 & r3
     jump r23
+
+.globl test_exponentiation
+test_exponentiation: // uint64_t test_exp(uint64_t value, uint32_t exp)
+ // value is passed via r0 (MBS), r1 (LBS) and r2 - exp
 
 .globl fast_loop
 fast_loop: // uint64_t fast_loop(const uint64_t *arr1, cosnt uint64_t *arr2)
@@ -88,7 +109,7 @@ for_every_exp_top:
     // partSum = partSum << exp
     // We don't need to care about shifting top part, 
     // because max number of ones is 32*64, well within 32bits
-    // lsl.u only works on bits 0:4 so max shift is 32, so we can 
+    // lsl.u only works on bits 0:4 so max shift is 31, so we can 
     // treat r5 as it was the high part, shift it by exp-32 and then we add it to the MSB of dot product (r8) 
     add tmp_val, exp, -32
     lsl r5, r5, tmp_val // In r5 we now have partsum shifted by exp
