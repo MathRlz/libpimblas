@@ -17,6 +17,7 @@ get_filename_component(FILE_NAME_WE ${file} NAME_WE)
 set(TNAME "${FILE_NAME_WE}.kernel")
 add_executable(${TNAME} ${file})
 target_compile_definitions(${TNAME} PRIVATE NR_TASKLETS=${NR_TASKLETS})
+target_compile_options(${TNAME} PRIVATE "-O3")
 
 # required for hack dpurte-clang
 target_link_options(${TNAME} PRIVATE -DNR_TASKLETS=${NR_TASKLETS}) 
