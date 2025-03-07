@@ -15,6 +15,7 @@ __dma_aligned float local_max[NR_TASKLETS];
 BARRIER_INIT(max_reduce_barrier, NR_TASKLETS);
 
 static int alignUpTo2(int value) { return (value + 1) & ~1; }
+static int alignUpTo8(int value) { return (value + 7) & ~7; }
 
 int main() {
     int tasklet_id = me();
@@ -31,11 +32,13 @@ int main() {
     for (int i = 0; i < elems_per_tasklet; i += LOCAL_BUFFER_SIZE) {
         
         int num_elems = LOCAL_BUFFER_SIZE;
+        unsigned int buffer_size = num_elems * sizeof(float);
         if (i + LOCAL_BUFFER_SIZE > elems_per_tasklet) {
             num_elems = elems_per_tasklet - i;
+            buffer_size = alignUpTo8(num_elems * sizeof(float));
         }
 
-        mram_read((__mram_ptr void *)(vec_mram + i), vec_local[tasklet_id], sizeof(float) * LOCAL_BUFFER_SIZE);
+        mram_read((__mram_ptr void *)(vec_mram + i), vec_local[tasklet_id], buffer_size);
         for (int j = 0; j < num_elems; j++) {
             if (vec_local[tasklet_id][j] > local_max[tasklet_id]) {
                 local_max[tasklet_id] = vec_local[tasklet_id][j];

@@ -1,13 +1,23 @@
 #include "common.hpp"
 #include "kernel.hpp"
 
-extern "C" {
+void set_vec_size(Kernel &kernel, size_t chunk_size, size_t size) {
+    uint32_t vec_size = static_cast<uint32_t>(chunk_size);
+    kernel.set_arg_broadcast_exact("vec_size", 0, &vec_size, sizeof(uint32_t), false);
+    uint32_t remainder = size % chunk_size;
+    if (size % chunk_size != 0) {
+        dpu_set_t last_dpu;
+        DPU_FOREACH(kernel.get_dpu_set(), last_dpu){}
+        dpu_copy_to(last_dpu, "vec_size", 0, &remainder, sizeof(uint32_t));
+    }
+}
 
+extern "C" {
     int softmax(const float *vec_in, float *vec_out, size_t size) {
         Kernel softmax;
 
-        size_t chunk_size = size;
-        uint32_t nr_dpus = 1;
+        size_t chunk_size = 1024;
+        uint32_t nr_dpus = (size - 1) / chunk_size + 1;
         std::cout << "nr dpus: " << nr_dpus << std::endl;
         if (false == softmax.allocate_n(nr_dpus)) {
             return -1;
@@ -19,8 +29,7 @@ extern "C" {
         // Load vector into DPUs
         softmax.set_arg_scatter(DPU_MRAM_HEAP_POINTER_NAME, 0, vec_in, chunk_size * sizeof(float), size * sizeof(float), false);
 
-        uint32_t vec_size = size;
-        softmax.set_arg_broadcast_exact("vec_size", 0, &vec_size, sizeof(uint32_t), false);
+        set_vec_size(softmax, chunk_size, size);
         softmax.launch(false);
         
         std::vector<float> max_values(nr_dpus);
@@ -32,14 +41,11 @@ extern "C" {
                 max_val = val;
             }
         }
-        std::cout << "max_val = " << max_val << std::endl;
-
-        //softmax.read_log();
 
         // Compute exponentials and local sum
         softmax.load_program("vec_exp_and_sum_f.kernel");
 
-        softmax.set_arg_broadcast_exact("vec_size", 0, &vec_size, sizeof(float), false);
+        set_vec_size(softmax, chunk_size, size);
         softmax.set_arg_broadcast_exact("max", 0, &max_val, sizeof(float), false);
 
         softmax.launch(false);
@@ -50,12 +56,11 @@ extern "C" {
         for (auto val : sums) {
             sum += val;
         }
-        std::cout << "sum = " << sum << std::endl;
 
         // Compute final softmax value by diving by the global sum
         softmax.load_program("vec_divide_f.kernel");
 
-        softmax.set_arg_broadcast_exact("vec_size", 0, &vec_size, sizeof(float), false);
+        set_vec_size(softmax, chunk_size, size);
         softmax.set_arg_broadcast_exact("divisor", 0, &sum, sizeof(float), false);
         softmax.launch(false);
 

@@ -27,6 +27,7 @@ class Kernel {
   void load_program(const char *name);
   void load_program(uint8_t *data, size_t size);
 
+  dpu_set_t &get_dpu_set() { return dpu_set; }
   void set_dpu_set(dpu_set_t dpu_set, uint32_t nr_dpus);
   bool allocate_n(uint32_t nr_dpus);
 

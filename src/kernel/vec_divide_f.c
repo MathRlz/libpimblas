@@ -9,6 +9,7 @@ __host float divisor;
 __dma_aligned float vec_local[NR_TASKLETS][LOCAL_BUFFER_SIZE];
 
 static int alignUpTo2(int value) { return (value + 1) & ~1; }
+static int alignUpTo8(int value) { return (value + 7) & ~7; }
 
 int main() {
     int tasklet_id = me();
@@ -24,16 +25,18 @@ int main() {
     for (int i = 0; i < elems_per_tasklet; i += LOCAL_BUFFER_SIZE) {
         
         int num_elems = LOCAL_BUFFER_SIZE;
+        unsigned int buffer_size = num_elems * sizeof(float);
         if (i + LOCAL_BUFFER_SIZE > elems_per_tasklet) {
             num_elems = elems_per_tasklet - i;
+            buffer_size = alignUpTo8(num_elems * sizeof(float));
         }
 
-        mram_read((__mram_ptr void *)(vec_mram + i), vec_local[tasklet_id], sizeof(float) * num_elems);
+        mram_read((__mram_ptr void *)(vec_mram + i), vec_local[tasklet_id], buffer_size);
         for (int j = 0; j < num_elems; j++) {
             vec_local[tasklet_id][j] /= divisor;
         }
         // Write back the new values
-        mram_write(vec_local[tasklet_id], (__mram_ptr void *)(vec_mram + i), sizeof(float) * num_elems);
+        mram_write(vec_local[tasklet_id], (__mram_ptr void *)(vec_mram + i), buffer_size);
     }
 
     return 0;
