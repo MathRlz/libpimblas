@@ -44,6 +44,8 @@ int vec_add_f(const float *input_a, const float *input_b, float *output, size_t 
 int vec_mul_f(const float *input_a, const float *input_b, float *output, size_t size);
 int vec_sub_f(const float *input_a, const float *input_b, float *output, size_t size);
 
+int softmax(const float *vec_in, float *vec_out, size_t size);
+
 /* CBLAS API */
 
 /* end of CBLAS API */

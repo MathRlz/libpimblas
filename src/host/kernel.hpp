@@ -20,16 +20,20 @@ class Kernel {
   void set_arg_broadcast(const char *sym_name, size_t sym_offset, const void *data, size_t size, bool async);
   void set_arg_broadcast_exact(const char *sym_name, size_t sym_offset, const void *data, size_t size, bool async);
   void get_arg_gather(const char *sym_name, size_t sym_offset, void *data, size_t chunk_size, size_t size, bool async);
+  void get_arg_copy_each(const char *sym_name, size_t sym_offset, void *data, size_t size);
 
   void launch(bool async);
 
   void load_program(const char *name);
   void load_program(uint8_t *data, size_t size);
 
-  void set_dpu_set(dpu_set_t dpu_set, size_t nr_dpus);
+  void set_dpu_set(dpu_set_t dpu_set, uint32_t nr_dpus);
+  bool allocate_n(uint32_t nr_dpus);
 
   void sync();
   const KernelStatus &get_status();
+
+  void read_log(FILE *stream = stdout);
 
   void free_dpus();
 

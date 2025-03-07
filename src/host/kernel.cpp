@@ -41,6 +41,14 @@ void Kernel::get_arg_gather(const char *sym_name, size_t sym_offset, void *data,
   }
 }
 
+void Kernel::get_arg_copy_each(const char *sym_name, size_t sym_offset, void *data, size_t size) {
+  dpu_set_t dpu;
+  uint32_t idx;
+  DPU_FOREACH(dpu_set, dpu, idx) {
+    DPU_ASSERT(dpu_copy_from(dpu, sym_name, sym_offset, reinterpret_cast<uint8_t*>(data) + idx * size, size));
+  }
+}
+
 void Kernel::launch(bool async) {
   if (async) {
     DPU_ASSERT(dpu_launch(dpu_set, DPU_ASYNCHRONOUS));
@@ -60,9 +68,18 @@ void Kernel::load_program(uint8_t *data, size_t size) {
   DPU_ASSERT(dpu_load_from_memory(dpu_set, data, size, &program));
 }
 
-void Kernel::set_dpu_set(dpu_set_t dpu_set, size_t nr_dpus) {
+void Kernel::set_dpu_set(dpu_set_t dpu_set, uint32_t nr_dpus) {
   this->dpu_set = dpu_set;
   this->nr_dpus = nr_dpus;
+}
+
+bool Kernel::allocate_n(uint32_t nr_dpus) {
+  if (dpu_alloc(nr_dpus, nullptr, &this->dpu_set) != DPU_OK) {
+    return false;
+  }
+
+  this->nr_dpus = nr_dpus;
+  return true;
 }
 
 void Kernel::sync() { DPU_ASSERT(dpu_sync(dpu_set)); }
@@ -70,6 +87,13 @@ void Kernel::sync() { DPU_ASSERT(dpu_sync(dpu_set)); }
 const KernelStatus &Kernel::get_status() {
   DPU_ASSERT(dpu_status(dpu_set, &status.done, &status.fault));
   return status;
+}
+
+void Kernel::read_log(FILE *stream) { 
+  dpu_set_t dpu;
+  DPU_FOREACH(dpu_set, dpu) {
+    DPU_ASSERT(dpu_log_read(dpu, stream));
+  }
 }
 
 void Kernel::free_dpus() { DPU_ASSERT(dpu_free(dpu_set)); }
