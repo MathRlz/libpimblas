@@ -48,7 +48,6 @@ int single_test_add(size_t size) {
   return 0;
 }
 
-
 int single_test_mul(size_t size) {
   auto sample_data_a = create_sample_data(size);
   auto sample_data_b = create_sample_data(size);
@@ -86,20 +85,20 @@ int single_test_sub(size_t size) {
 }
 
 int main(int argc, char **argv) {
-  for(int i = 0; i<10; i++){
-    if (single_test_add(10000+i) != 0) {
+  for (int i = 0; i < 10; i++) {
+    if (single_test_add(10000 + i) != 0) {
       printf("ADD TEST FAILED\n");
       RET_TEST_FAIL;
     }
   }
-  for(int i = 0; i<10; i++){
-    if (single_test_mul(10000+i) != 0) {
+  for (int i = 0; i < 10; i++) {
+    if (single_test_mul(10000 + i) != 0) {
       printf("MUL TEST FAILED\n");
       RET_TEST_FAIL;
     }
   }
-  for(int i = 0; i<10; i++){
-    if (single_test_sub(10000+i) != 0) {
+  for (int i = 0; i < 10; i++) {
+    if (single_test_sub(10000 + i) != 0) {
       printf("SUB TEST FAILED\n");
       RET_TEST_FAIL;
     }

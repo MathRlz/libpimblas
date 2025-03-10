@@ -100,4 +100,3 @@ bool mostly_same_abs(T *bufferA, T *bufferB, size_t size, T absTolerance) {
   }
   return valid;
 }
-

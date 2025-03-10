@@ -65,5 +65,4 @@ int main() {
     }
     mram_write(local_cache_a, buffer_a + (full_copies * BUFFER_SIZE), reminder * sizeof(float));
   }
-  
 }
