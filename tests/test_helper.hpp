@@ -75,7 +75,7 @@ bool same_vectors(const V &v1, const V &v2) {
   return std::equal(v1.begin(), v1.end(), v2.begin());
 }
 template <typename T>
-bool mostly_same(T *bufferA, T *bufferB, size_t size, T relTolerance) {
+bool mostly_same_rel(T *bufferA, T *bufferB, size_t size, T relTolerance) {
   bool valid = true;
   for (size_t i = 0; i < size; i++) {
     auto diff = std::abs(bufferA[i] - bufferB[i]);
@@ -87,3 +87,17 @@ bool mostly_same(T *bufferA, T *bufferB, size_t size, T relTolerance) {
   }
   return valid;
 }
+
+template <typename T>
+bool mostly_same_abs(T *bufferA, T *bufferB, size_t size, T absTolerance) {
+  bool valid = true;
+  for (size_t i = 0; i < size; i++) {
+    auto diff = std::abs(bufferA[i] - bufferB[i]);
+    if (diff > absTolerance) {
+      std::cout << bufferA[i] << " " << bufferB[i] << " differ at " << i << ".\n";
+      valid = false;
+    }
+  }
+  return valid;
+}
+

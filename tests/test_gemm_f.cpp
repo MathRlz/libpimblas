@@ -56,7 +56,7 @@ bool test_sgemm_wrapper() {
   host_sgemm_column_major(A.data(), B.data(), C_host.data(), alpha, beta, M, N, K);
 
   // 0.01 percent difference at most
-  return mostly_same(C.data(), C_host.data(), M * N, 1e-4f);
+  return mostly_same_rel(C.data(), C_host.data(), M * N, 1e-4f);
 }
 
 bool test_gemm_row_maj_f() {
@@ -73,7 +73,7 @@ bool test_gemm_row_maj_f() {
   gemm_row_maj_f(&M, &N, &K, &alpha, A.data(), B.data(), &beta, C.data());
   host_sgemm_row_major(A.data(), B.data(), C_host.data(), alpha, beta, M, N, K);
 
-  return mostly_same(C.data(), C_host.data(), M * N, 1e-4f);
+  return mostly_same_rel(C.data(), C_host.data(), M * N, 1e-4f);
 }
 
 int main(int argc, char **argv) {

@@ -45,7 +45,7 @@ int main(int argc, char **argv) {
   }
 
   // 0.01 percent difference at most
-  bool same = mostly_same(y.data(), y_host.data(), M, 1e-4f);
+  bool same = mostly_same_rel(y.data(), y_host.data(), M, 1e-4f);
   if (same) {
     std::cout << "SUCCESS " << std::endl;
     RET_TEST_OK;
