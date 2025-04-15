@@ -26,12 +26,7 @@ row_size - maximum size of single matrix row
 
 */
 
-// We've got 64KB of WRAM, we are working with 4B ints, and need to allocate wram
-// for part of A rows, and part of X rows and output(small in comparison), and 16 tasklets.
-// That makes 4KB per tasklet, that means we could go to block size 512 - aka 4KB, but that
-// would leave no place for output. So we stick with 256 for now.
-// TODO: Find even more optimal value
-#define BLOCK_SIZE 64
+#define BLOCK_SIZE 512
 
 struct params {
   uint32_t rows_per_dpu;
@@ -69,9 +64,6 @@ int main() {
 
   // Note: All MRAM allocations need to be 8B aligned in order to read from/write to them.
 
-  // Offset of A_mram should be 8B aligned,
-  // even if row_size is odd, rows_per_tasklet is always aligned to 2,
-  // so it should be fine, because we are operating 4B ints.
   uint32_t mram_offset_in_bytes = 0;
 
   int8_t *A_mram = (int8_t *)(DPU_MRAM_HEAP_POINTER + mram_offset_in_bytes +
@@ -96,8 +88,6 @@ int main() {
   // We add 64B in order to be aligned.
   int8_t *A_wram = (int *)mem_alloc((BLOCK_SIZE) * sizeof(int8_t) + 64);
 
-  // Allocation needs to be aligned to 64B, or we start getting
-  // allocations on top of another...
   uint32_t result_size = alignUpTo64(rows_per_tasklet * sizeof(int));
   int *mul_result_wram = (int *)mem_alloc(result_size);
 
@@ -115,10 +105,6 @@ int main() {
       int8_t *A_wram_read = NULL;
 
       if (a_offset & 7) {
-        // If offset is not aligned to 8B it will be automatically aligned down to 8 bytes
-        // This happens when row_size is an odd value.
-        // In our case when we are working on 4B ints it means we need to shift
-        // one int (4B) to get to the values we want. That also means we need to read a bit more
         int offset = (a_offset & 7);
         mram_read((__mram_ptr void *)(alignDownTo8(a_offset)), A_wram, (BLOCK_SIZE + 8) * sizeof(int8_t));
         A_wram_read = (A_wram + offset);
@@ -130,7 +116,6 @@ int main() {
       int sum = 0;
 #pragma unroll
       for (uint32_t j = 0; j < block_length; ++j) {
-        // sum += (int)A_wram_read[j] * (int)x_wram[j];
         int tmp;
         __builtin_mul_sl_sl_rrr(tmp, A_wram_read[j], x_wram[j]);
         sum += tmp;
@@ -140,11 +125,11 @@ int main() {
     }
   }
 
-  if (args.beta != 0.0f) {
+  if (args.beta != 0) {
     int *result_wram = (int *)mem_alloc(result_size);
     mram_read((__mram_ptr void *)(result_mram), result_wram, rows_per_tasklet * sizeof(int));
 
-    if (args.alpha != 1.0f) {
+    if (args.alpha != 1) {
       for (uint32_t i = 0; i < rows_per_tasklet; i++) {
         result_wram[i] = args.alpha * mul_result_wram[i] + args.beta * result_wram[i];
       }
@@ -155,7 +140,7 @@ int main() {
     }
     mram_write(result_wram, (__mram_ptr void *)result_mram, rows_per_tasklet * sizeof(int));
   } else {
-    if (args.alpha != 1.0f) {
+    if (args.alpha != 1) {
       for (uint32_t i = 0; i < rows_per_tasklet; i++) {
         mul_result_wram[i] = args.alpha * mul_result_wram[i];
       }

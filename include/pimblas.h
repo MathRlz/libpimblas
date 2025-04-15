@@ -41,6 +41,8 @@ void gemm_row_maj_f(const int *m, const int *n, const int *k, const float *alpha
                     const float *beta, float *c);
 void gemm_row_maj_int8(const int *m, const int *n, const int *k, const int *alpha, const int8_t *a, const int8_t *b,
                        const int *beta, int *c);
+void gemm_row_maj_int32(const int *m, const int *n, const int *k, const int *alpha, const int32_t *a, const int32_t *b,
+                        const int *beta, int *c);
 
 int relu_f(const float *input, float *output, size_t num_elem);
 int vec_add_f(const float *input_a, const float *input_b, float *output, size_t size);

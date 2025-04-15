@@ -10,7 +10,9 @@ int gemv_int8(uint32_t m, uint32_t n, const int8_t *A, const int8_t *x, int *y, 
   kernel.set_params(alpha, beta, false);
   kernel.set_A(A, true);
   kernel.set_x(x, true);
-  kernel.set_y(y, true);
+  if (beta != 0) {
+    kernel.set_y(y, true);
+  }
   kernel.launch(true);
   kernel.get_y(y, true);
   kernel.sync();
