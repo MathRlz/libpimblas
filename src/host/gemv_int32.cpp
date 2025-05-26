@@ -14,7 +14,6 @@ int gemv_int32(uint32_t m, uint32_t n, const int *A, const int *x, int *y, const
   kernel.launch(true);
   kernel.get_y(y, true);
   kernel.sync();
-  kernel.free_dpus();
   return 0;
 }
 }

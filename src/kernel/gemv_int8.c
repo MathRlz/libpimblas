@@ -139,7 +139,7 @@ int main() {
       // If offset is not aligned to 8B it will be automatically aligned down to 8 bytes
       // This happens when row_size is an odd value.
       int A_offset = A_mram_offset + i * args.row_size + b_offset;
-      int8_t* A_wram_read = A_wram;
+      int8_t *A_wram_read = A_wram;
       int acc = 0;
       int j = 0;
       if (A_offset & 7) {
@@ -148,13 +148,13 @@ int main() {
       } else {
         mram_read((__mram_ptr void *)(A_mram + A_offset), A_wram, BLOCK_SIZE);
 
-        #pragma unroll(64)
+#pragma unroll(64)
         for (; j < ROUND_DOWN(b_length, 512); j += 8) {
           DOT_8(&A_wram_read[j], &x_wram[j], acc);
         }
       }
 
-      #pragma unroll(64)
+#pragma unroll(64)
       for (; j < ROUND_DOWN(b_length, 64); ++j) {
         acc += A_wram_read[j] * x_wram[j];
       }

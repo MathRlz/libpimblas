@@ -18,7 +18,6 @@ int gemv_f_basic(uint32_t m, uint32_t n, const float *mat, const float *vec, flo
   kernel.launch(true);
   kernel.get_y(out, true);
   kernel.sync();
-  kernel.free_dpus();
   return 0;
 }
 
@@ -32,7 +31,6 @@ int gemv_f(uint32_t m, uint32_t n, const float *A, const float *x, float *y, con
   kernel.launch(true);
   kernel.get_y(y, true);
   kernel.sync();
-  kernel.free_dpus();
   return 0;
 }
 }

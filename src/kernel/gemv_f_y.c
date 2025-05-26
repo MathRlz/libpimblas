@@ -135,9 +135,16 @@ int main() {
   float *result_wram = (float *)mem_alloc(result_size);
   mram_read((__mram_ptr void *)(result_mram), result_wram, rows_per_tasklet * sizeof(float));
 
-  for (uint32_t i = 0; i < rows_per_tasklet; i++) {
-    // y = alpha * Ax + beta * y
-    result_wram[i] = args.alpha * mul_result_wram[i] + args.beta * result_wram[i];
+  if (args.beta != 0) {
+    for (uint32_t i = 0; i < rows_per_tasklet; i++) {
+      // y = alpha * Ax + beta * y
+      result_wram[i] = args.alpha * mul_result_wram[i] + args.beta * result_wram[i];
+    }
+  } else {
+    for (uint32_t i = 0; i < rows_per_tasklet; i++) {
+      // y = alpha * Ax
+      result_wram[i] = args.alpha * mul_result_wram[i];
+    }
   }
 
   mram_write(result_wram, (__mram_ptr void *)result_mram, rows_per_tasklet * sizeof(float));
