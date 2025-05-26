@@ -200,7 +200,7 @@ void sgemm_wrapper(const char *transa, const char *transb, const int *m, const i
   // C is already in column major order no need to do anything
   assert(*ldc == *m && "Unexpected padding in matrix C - UNHANDLED");
 
-  sgemm<float, float, GEMVF_Kernel_Beta>(*m, *k, *n, a_buffer, b_buffer, c, alpha, beta);
+  sgemm<float, float, GEMVF_Kernel>(*m, *k, *n, a_buffer, b_buffer, c, alpha, beta);
 
   free(a_tmp_buffer);
   free(b_tmp_buffer);
@@ -230,7 +230,7 @@ void gemm_row_maj_f(const int *m, const int *n, const int *k, const float *alpha
     transpose_matrix_row_major(c, tmp_c, *m, *n);
   }
 
-  sgemm<float, float, GEMVF_Kernel_Beta>(*m, *k, *n, a, tmp_b, tmp_c, alpha, beta);
+  sgemm<float, float, GEMVF_Kernel>(*m, *k, *n, a, tmp_b, tmp_c, alpha, beta);
 
   // Get C from col major to row major
   transpose_matrix_column_major(tmp_c, c, *m, *n);
