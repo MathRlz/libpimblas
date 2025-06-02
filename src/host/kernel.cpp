@@ -1,6 +1,10 @@
 #include "kernel.hpp"
 
+#include <array>
+
 #include "dpu_transfer_helper.hpp"
+
+Kernel::~Kernel() { free_dpus(); }
 
 void Kernel::set_arg_scatter(const char *sym_name, size_t sym_offset, const void *data, size_t chunk_size, size_t size,
                              bool async) {
@@ -98,4 +102,26 @@ void Kernel::read_log(FILE *stream) {
   DPU_FOREACH(dpu_set, dpu) { dpu_log_read(dpu, stream); }
 }
 
-void Kernel::free_dpus() { DPU_ASSERT(dpu_free(dpu_set)); }
+void Kernel::free_dpus() {
+  if (dpu_set.kind == DPU_SET_DPU && dpu_set.dpu != nullptr ||
+      dpu_set.kind == DPU_SET_RANKS && dpu_set.list.ranks != nullptr) {
+    dpu_free(dpu_set);
+  }
+}
+
+std::vector<PerfResults> Kernel::get_perf_results() {
+  std::vector<PerfResults> results;
+
+  dpu_set_t dpu;
+  DPU_FOREACH(dpu_set, dpu) {
+    std::array<uint32_t, 16> nb_cycles;
+    std::array<uint32_t, 16> nb_instr;
+    DPU_ASSERT(dpu_copy_from(dpu, "nb_cycles", 0, nb_cycles.data(), sizeof(uint32_t) * 16));
+    DPU_ASSERT(dpu_copy_from(dpu, "nb_instructions", 0, nb_instr.data(), sizeof(uint32_t) * 16));
+
+    results.push_back(PerfResults{.nb_cycles = *std::max_element(nb_cycles.begin(), nb_cycles.end()),
+                                  .nb_instr = *std::max_element(nb_instr.begin(), nb_instr.end())});
+  }
+
+  return results;
+}

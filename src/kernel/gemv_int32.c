@@ -24,12 +24,8 @@ row_size - maximum size of single matrix row
 
 */
 
-// We've got 64KB of WRAM, we are working with 4B ints, and need to allocate wram
-// for part of A rows, and part of X rows and output(small in comparison), and 16 tasklets.
-// That makes 4KB per tasklet, that means we could go to block size 512 - aka 4KB, but that
-// would leave no place for output. So we stick with 256 for now.
-// TODO: Find even more optimal value
-#define BLOCK_SIZE 64
+// We can't read more than 2048B using mram_read
+#define BLOCK_SIZE 256
 
 struct params {
   uint32_t rows_per_dpu;
@@ -37,6 +33,62 @@ struct params {
   int alpha;
   int beta;
 };
+
+__attribute__((always_inline)) static int32_t mul32(register int32_t x, register int32_t y) {
+  int32_t xh, yh, result, tmp, sign;
+  __asm__(
+      "  lsr %[xh], %[xl], 31, z, 11f\n"
+      "  neg %[xl], %[xl]\n"  // compute (~x + 1)
+      "11:\n"
+      "  lsr %[yh], %[yl], 31, z, 12f\n"
+      "  neg %[yl], %[yl]\n"  // compute (~y + 1)
+
+      "12:\n"
+      "  xor %[t4], %[xh], %[yh]\n"
+
+      "  lsr %[xh], %[xl], 16\n"      // x3 x2
+      "  and %[xl], %[xl], 0xFFFF\n"  // x1 x0
+      "  lsr %[yh], %[yl], 16\n"      // y3 y2
+      " and %[yl], %[yl], 0xFFFF\n"   // y1 y0
+
+      "  mul_ul_ul %[t2], %[xl], %[yl]\n"  // x0 * y0
+
+      "  mul_ul_uh %[t3], %[xl], %[yl], z, 1f\n"  // x0 * y1
+      "  lsl_add %[t2], %[t2], %[t3], 8\n"
+      "1:\n"
+      "  mul_uh_ul %[t3], %[xl], %[yl], z, 2f\n"  // x1 * y0
+      "  lsl_add %[t2], %[t2], %[t3], 8\n"
+      "2:\n"
+      "  mul_uh_uh %[t3], %[xl], %[yl], z, 3f\n"  // x1 * y1
+      "  lsl_add %[t2], %[t2], %[t3], 16\n"
+      "3:\n"
+      "  mul_ul_ul %[t3], %[xl], %[yh], z, 4f\n"  // x0 * y2
+      "  lsl_add %[t2], %[t2], %[t3], 16\n"
+      "4:\n"
+      "  mul_ul_uh %[t3], %[xl], %[yh], z, 5f\n"  // x0 * y3
+      "  lsl_add %[t2], %[t2], %[t3], 24\n"
+      "5:\n"
+      "  mul_uh_ul %[t3], %[xl], %[yh], z, 6f\n"  // x1 * y2
+      "  lsl_add %[t2], %[t2], %[t3], 24\n"
+      "6:\n"
+      "  mul_ul_ul %[t3], %[xh], %[yl], z, 7f\n"  // x2 * y0
+      "  lsl_add %[t2], %[t2], %[t3], 16\n"
+      "7:\n"
+      "  mul_ul_uh %[t3], %[xh], %[yl], z, 8f\n"  // x2 * y1
+      "  lsl_add %[t2], %[t2], %[t3], 24\n"
+      "8:\n"
+      "  mul_uh_ul %[t3], %[xh], %[yl], z, 9f\n"  // x3 * y0
+      "  lsl_add %[t2], %[t2], %[t3], 24\n"
+      "9:\n"
+      " jeq %[t4], 0, 10f\n"
+      " neg %[t2], %[t2]\n"  // if signs are different negate the result
+      "10:\n"
+      : [t2] "=&r"(result), [xh] "=&r"(xh), [yh] "=&r"(yh), [t3] "=&r"(tmp), [t4] "=&r"(sign)
+      : [xl] "+r"(x), [yl] "+r"(y)
+      :);
+
+  return result;
+}
 
 __host struct params args;
 
@@ -122,9 +174,9 @@ int main() {
       }
 
       int sum = 0;
-#pragma unroll
+#pragma unroll(16)
       for (uint32_t j = 0; j < block_length; ++j) {
-        sum += A_wram_read[j] * x_wram[j];
+        sum += mul32(A_wram_read[j], x_wram[j]);
       }
 
       mul_result_wram[i] += sum;
@@ -146,7 +198,7 @@ int main() {
     }
     mram_write(result_wram, (__mram_ptr void *)result_mram, rows_per_tasklet * sizeof(int));
   } else {
-    if (args.alpha != 1.0f) {
+    if (args.alpha != 1) {
       for (uint32_t i = 0; i < rows_per_tasklet; i++) {
         mul_result_wram[i] = args.alpha * mul_result_wram[i];
       }

@@ -23,8 +23,6 @@ const char *pimblas_get_git_version();
 int pimblas_test_function(int c);
 int pimblas_relu(void *ptr, size_t size);
 
-int gemv(uint32_t m, uint32_t n, const int *mat, const int *vec, int *out);
-
 int gemv_f_basic(uint32_t m, uint32_t n, const float *mat, const float *vec, float *out);
 
 int gemv_f(uint32_t m, uint32_t n, const float *A, const float *x, float *y, const float *alpha, const float *beta);

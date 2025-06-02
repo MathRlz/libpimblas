@@ -10,10 +10,20 @@ struct KernelStatus {
   bool fault;
 };
 
+struct PerfResults {
+  uint32_t nb_cycles;
+  uint32_t nb_instr;
+};
+
 class Kernel {
  public:
   Kernel() = default;
-  ~Kernel() = default;
+  ~Kernel();
+
+  Kernel(const Kernel &) = delete;
+  Kernel &operator=(const Kernel &) = delete;
+  Kernel(Kernel &&) = delete;
+  Kernel &operator=(Kernel &&) = delete;
 
   void set_arg_scatter(const char *sym_name, size_t sym_offset, const void *data, size_t chunk_size, size_t size,
                        bool async);
@@ -38,9 +48,11 @@ class Kernel {
 
   void read_log(FILE *stream = stdout);
 
-  void free_dpus();
+  std::vector<PerfResults> get_perf_results();
 
  protected:
+  void free_dpus();
+
   dpu_set_t dpu_set;
   uint32_t nr_dpus;
   dpu_program_t *program;

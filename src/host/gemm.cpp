@@ -1,6 +1,7 @@
 #include <cassert>
 #include <chrono>
 #include <iomanip>
+#include <memory>
 #include <type_traits>
 
 #include "dpu_transfer_helper.hpp"
@@ -45,7 +46,8 @@ void print_matrix_col_major(const T *mat, size_t rows, size_t cols) {
 
 template <class Kernel>
 struct SCS {  // Single Column Solver
-  Kernel kernel;
+  SCS() : column(-1) { kernel = std::unique_ptr<Kernel>(new Kernel()); }
+  std::unique_ptr<Kernel> kernel;
   int column = -1;
 };
 
@@ -61,7 +63,7 @@ class MCS {  // Multi Column Solver
 
   SCS<Kernel> &get_free_kernel() {
     while (true) {
-      if (it->kernel.get_status().done) {
+      if (it->kernel->get_status().done) {
         return *it;
       }
       if (std::next(it) == solvers.end()) {
@@ -81,22 +83,22 @@ class MCS {  // Multi Column Solver
 // A is of size rowsA x rowsB
 // B rowsB x colsB
 // C rowsA x colsB
-void sgemm_int32(uint32_t rowsA, uint32_t rowsB, uint32_t colsB, const int32_t *A, const int32_t *B, int32_t *C,
-                 const int *alpha, const int *beta) {
+template <typename inType, typename outType, class Kernel>
+void sgemm(uint32_t rowsA, uint32_t rowsB, uint32_t colsB, const inType *A, const inType *B, outType *C,
+           const outType *alpha, const outType *beta) {
   uint32_t nr_dpus = 512;
   uint32_t rows_per_dpu = 0;
-  gemv_launch_statistics<int32_t>(rowsA, rowsB, nr_dpus, rows_per_dpu);
+  gemv_launch_statistics<outType>(rowsA, rowsB, nr_dpus, rows_per_dpu);
 
   auto nr_solvers = std::min(8 * 8 * 2 * 20 / nr_dpus, (colsB + 1) / 2);
-
   bool has_beta = (*beta != 0);
-  MCS<GEMV_INT32_Kernel> mcs(nr_solvers);
+  MCS<Kernel> mcs(nr_solvers);
 
   auto &solvers = mcs.get_solvers();
   size_t kernel_it = 0;
   for (kernel_it = 0; kernel_it < nr_solvers; kernel_it++) {
     auto &kernel = solvers[kernel_it].kernel;
-    if (kernel.init(rowsA, rowsB, nr_dpus, rows_per_dpu) == false) {
+    if (kernel->init(rowsA, rowsB, nr_dpus, rows_per_dpu) == false) {
       break;
     }
   }
@@ -104,8 +106,8 @@ void sgemm_int32(uint32_t rowsA, uint32_t rowsB, uint32_t colsB, const int32_t *
 
   for (auto &scs : solvers) {
     auto &kernel = scs.kernel;
-    kernel.set_params(alpha, beta, false);
-    kernel.set_A(A, true);
+    kernel->set_params(alpha, beta, false);
+    kernel->set_A(A, true);
   }
 
   show_trace("Running {} kernels. Each kernel with {} DPUs.\n", solvers.size(), nr_dpus);
@@ -115,183 +117,23 @@ void sgemm_int32(uint32_t rowsA, uint32_t rowsB, uint32_t colsB, const int32_t *
     auto &scs = mcs.get_free_kernel();
     auto &kernel = scs.kernel;
     if (scs.column != -1) {
-      kernel.get_y_safe(C + rowsA * scs.column);
+      kernel->get_y_safe(C + rowsA * scs.column);
       scs.column = -1;
     }
-    kernel.set_x(B + rowsB * i, true);
+    kernel->set_x(B + rowsB * i, true);
     if (has_beta) {
-      kernel.set_y(C + rowsA * i, true);
+      kernel->set_y(C + rowsA * i, true);
     }
-    kernel.launch(true);
+    kernel->launch(true);
     scs.column = i;
   }
 
   for (auto &scs : solvers) {
     auto &kernel = scs.kernel;
     if (scs.column != -1) {
-      kernel.sync();
-      kernel.get_y_safe(C + rowsA * scs.column);
+      kernel->sync();
+      kernel->get_y_safe(C + rowsA * scs.column);
       scs.column = -1;
-    }
-
-    kernel.free_dpus();
-  }
-}
-
-// Assumption A is in row order, B and C are in column order
-// A is of size rowsA x rowsB
-// B rowsB x colsB
-// C rowsA x colsB
-void sgemm_int8(uint32_t rowsA, uint32_t rowsB, uint32_t colsB, const int8_t *A, const int8_t *B, int32_t *C,
-                const int *alpha, const int *beta) {
-  uint32_t nr_dpus = 512;
-  uint32_t rows_per_dpu = 0;
-  gemv_launch_statistics<int32_t>(rowsA, rowsB, nr_dpus, rows_per_dpu);
-
-  auto nr_solvers = std::min(8 * 8 * 2 * 20 / nr_dpus, (colsB + 1) / 2);
-
-  bool has_beta = (*beta != 0);
-  MCS<GEMV_INT8_Kernel> mcs(nr_solvers);
-
-  auto &solvers = mcs.get_solvers();
-  size_t kernel_it = 0;
-  for (kernel_it = 0; kernel_it < nr_solvers; kernel_it++) {
-    auto &kernel = solvers[kernel_it].kernel;
-    if (kernel.init(rowsA, rowsB, nr_dpus, rows_per_dpu) == false) {
-      break;
-    }
-  }
-  solvers.resize(kernel_it);
-
-  for (auto &scs : solvers) {
-    auto &kernel = scs.kernel;
-    kernel.set_params(alpha, beta, false);
-    kernel.set_A(A, true);
-  }
-
-  show_trace("Running {} kernels. Each kernel with {} DPUs.\n", solvers.size(), nr_dpus);
-
-  size_t cur_kernel = 0;
-  for (uint32_t i = 0; i < colsB; i++) {
-    auto &scs = mcs.get_free_kernel();
-    auto &kernel = scs.kernel;
-    if (scs.column != -1) {
-      kernel.get_y_safe(C + rowsA * scs.column);
-      scs.column = -1;
-    }
-    kernel.set_x(B + rowsB * i, true);
-    if (has_beta) {
-      kernel.set_y(C + rowsA * i, true);
-    }
-    kernel.launch(true);
-    scs.column = i;
-  }
-
-  for (auto &scs : solvers) {
-    auto &kernel = scs.kernel;
-    if (scs.column != -1) {
-      kernel.sync();
-      kernel.get_y_safe(C + rowsA * scs.column);
-      scs.column = -1;
-    }
-
-    kernel.free_dpus();
-  }
-}
-
-// Assumption A is in row order, B and C are in column order
-// A is of size rowsA x rowsB
-// B rowsB x colsB
-// C rowsA x colsB
-void sgemm_f(uint32_t rowsA, uint32_t rowsB, uint32_t colsB, const float *A, const float *B, float *C,
-             const float *alpha, const float *beta) {
-  uint32_t nr_dpus = 512;
-  uint32_t rows_per_dpu = 0;
-  gemv_launch_statistics<float>(rowsA, rowsB, nr_dpus, rows_per_dpu);
-
-  auto nr_solvers = std::min(8 * 8 * 2 * 20 / nr_dpus, (colsB + 1) / 2);
-
-  if (*beta == 0.0f) {
-    MCS<GEMVF_Kernel> mcs(nr_solvers);
-
-    auto &solvers = mcs.get_solvers();
-    size_t kernel_it = 0;
-    for (kernel_it = 0; kernel_it < nr_solvers; kernel_it++) {
-      auto &kernel = solvers[kernel_it].kernel;
-      if (kernel.init(rowsA, rowsB, nr_dpus, rows_per_dpu) == false) {
-        break;
-      }
-    }
-    solvers.resize(kernel_it);
-
-    for (auto &scs : solvers) {
-      auto &kernel = scs.kernel;
-      kernel.set_params(alpha, false);
-      kernel.set_A(A, true);
-    }
-
-    show_trace("Running {} kernels. Each kernel with {} DPUs.\n", solvers.size(), nr_dpus);
-
-    size_t cur_kernel = 0;
-    for (uint32_t i = 0; i < colsB; i++) {
-      auto &scs = mcs.get_free_kernel();
-      auto &kernel = scs.kernel;
-      if (scs.column != -1) {
-        kernel.sync();
-        kernel.get_y_safe(C + rowsA * scs.column);
-        scs.column = -1;
-      }
-      kernel.set_x(B + rowsB * i, true);
-      kernel.launch(true);
-      scs.column = i;
-    }
-
-    for (auto &scs : solvers) {
-      if (scs.column != -1) {
-        scs.kernel.get_y_safe(C + rowsA * scs.column);
-      }
-      scs.kernel.free_dpus();
-    }
-  } else {
-    MCS<GEMVF_Kernel_Beta> mcs(nr_solvers);
-    auto &solvers = mcs.get_solvers();
-    size_t kernel_it = 0;
-    for (kernel_it = 0; kernel_it < solvers.size(); kernel_it++) {
-      auto &kernel = solvers[kernel_it].kernel;
-      if (kernel.init(rowsA, rowsB, nr_dpus, rows_per_dpu) == false) {
-        break;
-      }
-
-      kernel.set_params(alpha, beta, false);
-      kernel.set_A(A, true);
-    }
-    solvers.resize(kernel_it);
-
-    show_trace("Running {} kernels. Each kernel with {} DPUs.\n", solvers.size(), nr_dpus);
-
-    size_t cur_kernel = 0;
-    for (uint32_t i = 0; i < colsB; i++) {
-      auto &scs = mcs.get_free_kernel();
-      auto &kernel = scs.kernel;
-      if (scs.column != -1) {
-        kernel.get_y_safe(C + rowsA * scs.column);
-        scs.column = -1;
-      }
-      kernel.set_x(B + rowsB * i, true);
-      kernel.set_y(C + rowsA * i, true);
-      kernel.launch(true);
-      scs.column = i;
-    }
-
-    for (auto &scs : solvers) {
-      auto &kernel = scs.kernel;
-      if (scs.column != -1) {
-        kernel.sync();
-        kernel.get_y_safe(C + rowsA * scs.column);
-        scs.column = -1;
-      }
-
-      kernel.free_dpus();
     }
   }
 }
@@ -358,7 +200,7 @@ void sgemm_wrapper(const char *transa, const char *transb, const int *m, const i
   // C is already in column major order no need to do anything
   assert(*ldc == *m && "Unexpected padding in matrix C - UNHANDLED");
 
-  sgemm_f(*m, *k, *n, a_buffer, b_buffer, c, alpha, beta);
+  sgemm<float, float, GEMVF_Kernel>(*m, *k, *n, a_buffer, b_buffer, c, alpha, beta);
 
   free(a_tmp_buffer);
   free(b_tmp_buffer);
@@ -388,7 +230,7 @@ void gemm_row_maj_f(const int *m, const int *n, const int *k, const float *alpha
     transpose_matrix_row_major(c, tmp_c, *m, *n);
   }
 
-  sgemm_f(*m, *k, *n, a, tmp_b, tmp_c, alpha, beta);
+  sgemm<float, float, GEMVF_Kernel>(*m, *k, *n, a, tmp_b, tmp_c, alpha, beta);
 
   // Get C from col major to row major
   transpose_matrix_column_major(tmp_c, c, *m, *n);
@@ -421,7 +263,7 @@ void gemm_row_maj_int8(const int *m, const int *n, const int *k, const int *alph
     transpose_matrix_row_major(c, tmp_c, *m, *n);
   }
 
-  sgemm_int8(*m, *k, *n, a, tmp_b, tmp_c, alpha, beta);
+  sgemm<int8_t, int32_t, GEMV_INT8_Kernel>(*m, *k, *n, a, tmp_b, tmp_c, alpha, beta);
 
   // Get C from col major to row major
   transpose_matrix_column_major(tmp_c, c, *m, *n);
@@ -454,7 +296,7 @@ void gemm_row_maj_int32(const int *m, const int *n, const int *k, const int *alp
     transpose_matrix_row_major(c, tmp_c, *m, *n);
   }
 
-  sgemm_int32(*m, *k, *n, a, tmp_b, tmp_c, alpha, beta);
+  sgemm<int32_t, int32_t, GEMV_INT32_Kernel>(*m, *k, *n, a, tmp_b, tmp_c, alpha, beta);
 
   // Get C from col major to row major
   transpose_matrix_column_major(tmp_c, c, *m, *n);
